@@ -124,3 +124,9 @@ class RecipeListItem(BaseModel):
     
     model_config = ConfigDict(from_attributes=True)
 
+
+class CategoryResponse(BaseModel):
+    """分类响应模型"""
+    key: str    # 分类标识符，如 "meat_dish"
+    label: str  # 中文名称，如 "肉类"
+

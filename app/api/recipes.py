@@ -1,12 +1,13 @@
 """
 菜谱 API 路由
 """
-from typing import List, Optional
+from typing import Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.schemas.recipe import (
+    CategoryResponse,
     RecipeCreate,
     RecipeUpdate,
     RecipeResponse,
@@ -15,6 +16,19 @@ from app.schemas.recipe import (
 from app.services.recipe import RecipeService
 
 router = APIRouter(tags=["recipes"])
+
+# 分类中文名称映射
+CATEGORY_NAMES: Dict[str, str] = {
+    "aquatic": "水产",
+    "breakfast": "早餐",
+    "condiment": "调味品",
+    "drink": "饮品",
+    "meat_dish": "肉类",
+    "semi-finished": "半成品",
+    "soup": "汤类",
+    "staple": "主食",
+    "vegetable_dish": "素菜",
+}
 
 
 @router.post("/", response_model=RecipeResponse, status_code=201)
@@ -88,11 +102,27 @@ async def delete_recipe(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.get("/categories/list", response_model=List[str])
+@router.get("/categories/list", response_model=List[CategoryResponse])
 async def get_categories(db: Session = Depends(get_db)):
-    """获取所有菜谱分类"""
+    """
+    获取所有菜谱分类（含中文名称）
+    
+    返回分类列表，每个分类包含:
+    - key: 分类标识符
+    - label: 中文名称
+    
+    前端可缓存此数据用于分类显示和筛选
+    """
     categories = RecipeService.get_categories(db)
-    return categories
+    
+    result = []
+    for key in categories:
+        result.append(CategoryResponse(
+            key=key,
+            label=CATEGORY_NAMES.get(key, key),
+        ))
+    
+    return result
 
 
 @router.post("/batch", response_model=List[RecipeResponse], status_code=201)

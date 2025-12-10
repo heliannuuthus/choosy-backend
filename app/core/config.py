@@ -3,7 +3,7 @@
 """
 from pydantic_settings import BaseSettings
 from typing import List
-
+import os
 
 class Settings(BaseSettings):
     """应用配置"""
@@ -26,9 +26,11 @@ class Settings(BaseSettings):
     CORS_ALLOW_METHODS: List[str] = ["*"]
     CORS_ALLOW_HEADERS: List[str] = ["*"]
     
+    DASHSCOPE_API_KEY: str = os.getenv("DASHSCOPE_API_KEY")
+    
     class Config:
         env_file = ".env"
-        case_sensitive = True
+        extra = "ignore"
 
 
 # 创建全局配置实例

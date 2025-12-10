@@ -10,6 +10,10 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "pydantic-settings>=2.0.0",
     "httpx>=0.25.0",
+    "langchain>=0.3.0",
+    "langchain-openai>=0.3.0",
+    "langgraph>=0.2.0",
+    "python-dotenv>=1.2.1",
 ]
 
 [tool.hatch.build.targets.wheel]

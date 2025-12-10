@@ -1,9 +1,9 @@
 """
 菜谱业务逻辑层
 """
-from typing import List, Optional
+from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 
 from app.models.recipe import Recipe, Ingredient, Step, AdditionalNote
 from app.schemas.recipe import RecipeCreate, RecipeUpdate
@@ -177,6 +177,16 @@ class RecipeService:
         """获取所有分类"""
         categories = db.query(Recipe.category).distinct().all()
         return [cat[0] for cat in categories if cat[0]]
+    
+    @staticmethod
+    def get_categories_with_count(db: Session) -> Dict[str, int]:
+        """获取所有分类及其菜谱数量"""
+        results = db.query(
+            Recipe.category,
+            func.count(Recipe.id)
+        ).group_by(Recipe.category).all()
+        
+        return {cat: count for cat, count in results if cat}
     
     @staticmethod
     def create_recipes_batch(db: Session, recipes: List[RecipeCreate]) -> List[Recipe]:
