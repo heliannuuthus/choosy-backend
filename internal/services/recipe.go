@@ -112,6 +112,73 @@ func (s *RecipeService) GetRecipes(category, search string, limit, offset int) (
 	return recipes, err
 }
 
+// RecipeFavoriteCount 菜谱收藏统计
+type RecipeFavoriteCount struct {
+	RecipeID string
+	Count    int
+}
+
+// GetHotRecipes 获取热门菜谱（按收藏数排序，service 层计算）
+func (s *RecipeService) GetHotRecipes(limit int, excludeIDs []string) ([]models.Recipe, error) {
+	// 1. 统计每个菜谱的收藏数
+	var counts []RecipeFavoriteCount
+	countQuery := s.db.Table("favorites").
+		Select("recipe_id, COUNT(*) as count").
+		Group("recipe_id").
+		Order("count DESC")
+
+	if err := countQuery.Find(&counts).Error; err != nil {
+		return nil, err
+	}
+
+	if len(counts) == 0 {
+		return []models.Recipe{}, nil
+	}
+
+	// 2. 构建排除 ID 集合
+	excludeMap := make(map[string]bool)
+	for _, id := range excludeIDs {
+		excludeMap[id] = true
+	}
+
+	// 3. 过滤并取前 N 个菜谱 ID
+	var recipeIDs []string
+	for _, c := range counts {
+		if excludeMap[c.RecipeID] {
+			continue
+		}
+		recipeIDs = append(recipeIDs, c.RecipeID)
+		if len(recipeIDs) >= limit {
+			break
+		}
+	}
+
+	if len(recipeIDs) == 0 {
+		return []models.Recipe{}, nil
+	}
+
+	// 4. 批量查询菜谱详情
+	var recipes []models.Recipe
+	if err := s.db.Where("id IN ?", recipeIDs).Find(&recipes).Error; err != nil {
+		return nil, err
+	}
+
+	// 5. 按收藏数顺序排序（保持原有顺序）
+	recipeMap := make(map[string]models.Recipe)
+	for _, r := range recipes {
+		recipeMap[r.ID] = r
+	}
+
+	result := make([]models.Recipe, 0, len(recipeIDs))
+	for _, id := range recipeIDs {
+		if r, ok := recipeMap[id]; ok {
+			result = append(result, r)
+		}
+	}
+
+	return result, nil
+}
+
 // UpdateRecipe 更新菜谱
 func (s *RecipeService) UpdateRecipe(id string, updates map[string]interface{}, ingredients []models.Ingredient, steps []models.Step, notes []string, updateIngredients, updateSteps, updateNotes bool) (*models.Recipe, error) {
 	// 检查菜谱是否存在
@@ -261,4 +328,3 @@ func (s *RecipeService) CreateRecipesBatch(recipes []models.Recipe, ingredientsL
 
 	return created, nil
 }
-

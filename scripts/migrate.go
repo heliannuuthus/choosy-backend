@@ -87,12 +87,12 @@ type Recipe struct {
 	ImagePath        *string     `gorm:"column:image_path"`
 	Images           StringSlice `gorm:"type:json;default:'[]'"`
 	Category         string      `gorm:"index"`
-	Difficulty       int         
+	Difficulty       int
 	Tags             StringSlice `gorm:"type:json;default:'[]'"`
-	Servings         int         
-	PrepTimeMinutes  *int        `gorm:"column:prep_time_minutes"`
-	CookTimeMinutes  *int        `gorm:"column:cook_time_minutes"`
-	TotalTimeMinutes *int        `gorm:"column:total_time_minutes"`
+	Servings         int
+	PrepTimeMinutes  *int `gorm:"column:prep_time_minutes"`
+	CookTimeMinutes  *int `gorm:"column:cook_time_minutes"`
+	TotalTimeMinutes *int `gorm:"column:total_time_minutes"`
 }
 
 func (Recipe) TableName() string {
@@ -101,13 +101,13 @@ func (Recipe) TableName() string {
 
 // Ingredient 食材
 type Ingredient struct {
-	ID           uint    `gorm:"primaryKey;autoIncrement"`
-	RecipeID     string  `gorm:"not null;index;column:recipe_id"`
-	Name         string  `gorm:"not null"`
-	Quantity     *float64 
-	Unit         *string  
-	TextQuantity string  `gorm:"not null;column:text_quantity"`
-	Notes        *string  
+	ID           uint   `gorm:"primaryKey;autoIncrement"`
+	RecipeID     string `gorm:"not null;index;column:recipe_id"`
+	Name         string `gorm:"not null"`
+	Quantity     *float64
+	Unit         *string
+	TextQuantity string `gorm:"not null;column:text_quantity"`
+	Notes        *string
 }
 
 func (Ingredient) TableName() string {
@@ -137,6 +137,18 @@ func (AdditionalNote) TableName() string {
 	return "additional_notes"
 }
 
+// Favorite 收藏
+type Favorite struct {
+	ID        string    `gorm:"primaryKey;column:id;size:32"`
+	OpenID    string    `gorm:"not null;index:idx_favorite_user;column:openid;size:64"`
+	RecipeID  string    `gorm:"not null;index:idx_favorite_recipe;column:recipe_id;size:64"`
+	CreatedAt time.Time `gorm:"not null;column:created_at"`
+}
+
+func (Favorite) TableName() string {
+	return "favorites"
+}
+
 func main() {
 	// 数据库路径
 	dbPath := "db/choosy.db"
@@ -164,12 +176,13 @@ func main() {
 
 	// 执行迁移
 	if err := db.AutoMigrate(
-		&User{}, 
-		&RefreshToken{}, 
+		&User{},
+		&RefreshToken{},
 		&Recipe{},
 		&Ingredient{},
 		&Step{},
 		&AdditionalNote{},
+		&Favorite{},
 	); err != nil {
 		log.Fatalf("迁移失败: %v", err)
 	}
@@ -181,4 +194,3 @@ func main() {
 	db.Raw("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").Scan(&tables)
 	fmt.Printf("当前表: %v\n", tables)
 }
-

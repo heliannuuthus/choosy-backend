@@ -25,10 +25,14 @@ func InitializeApp() (*App, error) {
 	db := database.Get()
 	recipeHandler := handlers.NewRecipeHandler(db)
 	authHandler := handlers.NewAuthHandler(db)
+	favoriteHandler := handlers.NewFavoriteHandler(db)
+	homeHandler := handlers.NewHomeHandler(db)
 	app := &App{
-		DB:            db,
-		RecipeHandler: recipeHandler,
-		AuthHandler:   authHandler,
+		DB:              db,
+		RecipeHandler:   recipeHandler,
+		AuthHandler:     authHandler,
+		FavoriteHandler: favoriteHandler,
+		HomeHandler:     homeHandler,
 	}
 	return app, nil
 }
@@ -36,11 +40,13 @@ func InitializeApp() (*App, error) {
 // wire.go:
 
 // ProviderSet 提供者集合
-var ProviderSet = wire.NewSet(database.Get, services.NewRecipeService, services.NewAuthService, handlers.NewRecipeHandler, handlers.NewAuthHandler)
+var ProviderSet = wire.NewSet(database.Get, services.NewRecipeService, services.NewAuthService, services.NewFavoriteService, handlers.NewRecipeHandler, handlers.NewAuthHandler, handlers.NewFavoriteHandler, handlers.NewHomeHandler)
 
 // App 应用依赖容器
 type App struct {
-	DB            *gorm.DB
-	RecipeHandler *handlers.RecipeHandler
-	AuthHandler   *handlers.AuthHandler
+	DB              *gorm.DB
+	RecipeHandler   *handlers.RecipeHandler
+	AuthHandler     *handlers.AuthHandler
+	FavoriteHandler *handlers.FavoriteHandler
+	HomeHandler     *handlers.HomeHandler
 }

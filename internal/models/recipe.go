@@ -63,12 +63,12 @@ func (Recipe) TableName() string {
 
 // Ingredient 食材表
 type Ingredient struct {
-	ID           uint    `gorm:"primaryKey;autoIncrement" json:"id"`
-	RecipeID     string  `gorm:"not null;index;column:recipe_id" json:"-"`
-	Name         string  `gorm:"not null" json:"name"`
+	ID           uint     `gorm:"primaryKey;autoIncrement" json:"id"`
+	RecipeID     string   `gorm:"not null;index;column:recipe_id" json:"-"`
+	Name         string   `gorm:"not null" json:"name"`
 	Quantity     *float64 `json:"quantity"`
 	Unit         *string  `json:"unit"`
-	TextQuantity string  `gorm:"not null;column:text_quantity" json:"text_quantity"`
+	TextQuantity string   `gorm:"not null;column:text_quantity" json:"text_quantity"`
 	Notes        *string  `json:"notes"`
 }
 
@@ -98,4 +98,3 @@ type AdditionalNote struct {
 func (AdditionalNote) TableName() string {
 	return "additional_notes"
 }
-

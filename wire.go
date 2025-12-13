@@ -17,15 +17,20 @@ var ProviderSet = wire.NewSet(
 	database.Get,
 	services.NewRecipeService,
 	services.NewAuthService,
+	services.NewFavoriteService,
 	handlers.NewRecipeHandler,
 	handlers.NewAuthHandler,
+	handlers.NewFavoriteHandler,
+	handlers.NewHomeHandler,
 )
 
 // App 应用依赖容器
 type App struct {
-	DB            *gorm.DB
-	RecipeHandler *handlers.RecipeHandler
-	AuthHandler   *handlers.AuthHandler
+	DB              *gorm.DB
+	RecipeHandler   *handlers.RecipeHandler
+	AuthHandler     *handlers.AuthHandler
+	FavoriteHandler *handlers.FavoriteHandler
+	HomeHandler     *handlers.HomeHandler
 }
 
 // InitializeApp 初始化应用（由 wire 生成）
