@@ -128,39 +128,11 @@ func V() *viper.Viper {
 	return v
 }
 
-// 便捷方法（线程安全）
-func GetString(key string) string {
-	mu.RLock()
-	defer mu.RUnlock()
-	return V().GetString(key)
-}
-
-func GetInt(key string) int {
-	mu.RLock()
-	defer mu.RUnlock()
-	return V().GetInt(key)
-}
-
-func GetBool(key string) bool {
-	mu.RLock()
-	defer mu.RUnlock()
-	return V().GetBool(key)
-}
-
-func GetStringSlice(key string) []string {
-	mu.RLock()
-	defer mu.RUnlock()
-	return V().GetStringSlice(key)
-}
-
-func GetStringMap(key string) map[string]any {
-	mu.RLock()
-	defer mu.RUnlock()
-	return V().GetStringMap(key)
-}
-
-func GetStringMapString(key string) map[string]string {
-	mu.RLock()
-	defer mu.RUnlock()
-	return V().GetStringMapString(key)
-}
+// 便捷方法（viper 内部已线程安全）
+func GetString(key string) string                     { return V().GetString(key) }
+func GetInt(key string) int                           { return V().GetInt(key) }
+func GetBool(key string) bool                         { return V().GetBool(key) }
+func GetStringSlice(key string) []string              { return V().GetStringSlice(key) }
+func GetStringMap(key string) map[string]any          { return V().GetStringMap(key) }
+func GetStringMapString(key string) map[string]string { return V().GetStringMapString(key) }
+func Get(key string) any                              { return V().Get(key) }

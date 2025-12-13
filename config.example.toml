@@ -41,3 +41,18 @@ maxRefreshToken = 10       # 每用户最大 refresh_token 数
 sign_key = ""  # Ed25519 签名密钥 (base64url 编码的 JWK)
 enc_key = ""   # A256GCM 加密密钥 (base64url 编码的 JWK)
 
+# 首页配置
+[[home.banners]]
+id = "banner_1"
+image_url = "https://example.com/banner1.jpg"
+title = "今日推荐"
+link = ""
+link_type = "none"  # recipe, url, none
+
+[[home.banners]]
+id = "banner_2"
+image_url = "https://example.com/banner2.jpg"
+title = "新菜上线"
+link = "recipe_id_here"
+link_type = "recipe"
+

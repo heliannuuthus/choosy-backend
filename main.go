@@ -47,6 +47,7 @@ func main() {
 
 	// 创建 Gin 引擎
 	r := gin.Default()
+	r.RedirectTrailingSlash = false
 
 	// 添加中间件
 	r.Use(middleware.CORS())
@@ -73,8 +74,8 @@ func main() {
 		// 认证路由（OAuth2.1 风格）
 		auth := api.Group("/auth")
 		{
-			auth.POST("/token", app.AuthHandler.Token)      // 获取/刷新 token
-			auth.POST("/revoke", app.AuthHandler.Revoke)    // 撤销 token
+			auth.POST("/token", app.AuthHandler.Token)   // 获取/刷新 token
+			auth.POST("/revoke", app.AuthHandler.Revoke) // 撤销 token
 			auth.POST("/revoke-all", middleware.RequireAuth(), app.AuthHandler.LogoutAll)
 			auth.GET("/profile", middleware.RequireAuth(), app.AuthHandler.Profile)
 			auth.PUT("/profile", middleware.RequireAuth(), app.AuthHandler.UpdateProfile)
@@ -90,6 +91,23 @@ func main() {
 			recipes.GET("/:recipe_id", app.RecipeHandler.GetRecipe)
 			recipes.PUT("/:recipe_id", app.RecipeHandler.UpdateRecipe)
 			recipes.DELETE("/:recipe_id", app.RecipeHandler.DeleteRecipe)
+		}
+
+		// 收藏路由
+		favorites := api.Group("/favorites")
+		favorites.Use(middleware.RequireAuth())
+		{
+			favorites.GET("/", app.FavoriteHandler.GetFavorites)
+			favorites.POST("/", app.FavoriteHandler.AddFavorite)
+			favorites.POST("/batch-check", app.FavoriteHandler.BatchCheckFavorites)
+			favorites.GET("/:recipe_id/check", app.FavoriteHandler.CheckFavorite)
+			favorites.DELETE("/:recipe_id", app.FavoriteHandler.RemoveFavorite)
+		}
+
+		// 首页路由
+		home := api.Group("/home")
+		{
+			home.GET("/config", app.HomeHandler.GetHomeConfig)
 		}
 	}
 
