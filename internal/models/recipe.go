@@ -37,24 +37,31 @@ func (s *StringSlice) Scan(value interface{}) error {
 
 // Recipe 菜谱表
 type Recipe struct {
-	ID               string      `gorm:"primaryKey;column:id" json:"id"`
-	Name             string      `gorm:"not null;index" json:"name"`
+	ID               uint        `gorm:"primaryKey;autoIncrement;column:_id" json:"-"`
+	RecipeID         string      `gorm:"uniqueIndex;not null;column:recipe_id;size:32" json:"id"`
+	Name             string      `gorm:"uniqueIndex;not null;size:128" json:"name"`
 	Description      *string     `gorm:"type:text" json:"description"`
-	SourcePath       *string     `gorm:"column:source_path" json:"source_path"`
-	ImagePath        *string     `gorm:"column:image_path" json:"image_path"`
 	Images           StringSlice `gorm:"type:json;default:'[]'" json:"images"`
 	Category         string      `gorm:"index" json:"category"`
 	Difficulty       int         `json:"difficulty"`
-	Tags             StringSlice `gorm:"type:json;default:'[]'" json:"tags"`
 	Servings         int         `json:"servings"`
 	PrepTimeMinutes  *int        `gorm:"column:prep_time_minutes" json:"prep_time_minutes"`
 	CookTimeMinutes  *int        `gorm:"column:cook_time_minutes" json:"cook_time_minutes"`
 	TotalTimeMinutes *int        `gorm:"column:total_time_minutes" json:"total_time_minutes"`
 
-	// 关联关系
-	Ingredients     []Ingredient     `gorm:"foreignKey:RecipeID;constraint:OnDelete:CASCADE" json:"ingredients"`
-	Steps           []Step           `gorm:"foreignKey:RecipeID;constraint:OnDelete:CASCADE" json:"steps"`
-	AdditionalNotes []AdditionalNote `gorm:"foreignKey:RecipeID;constraint:OnDelete:CASCADE" json:"additional_notes"`
+	// 关联关系（无外键约束，在应用层处理，使用 recipe_id 作为关联字段）
+	Ingredients     []Ingredient     `gorm:"foreignKey:RecipeID;references:RecipeID" json:"ingredients"`
+	Steps           []Step           `gorm:"foreignKey:RecipeID;references:RecipeID" json:"steps"`
+	AdditionalNotes []AdditionalNote `gorm:"foreignKey:RecipeID;references:RecipeID" json:"additional_notes"`
+	Tags            []Tag            `gorm:"-" json:"tags"` // 不自动 JOIN，在 service 层手动填充
+}
+
+// GetImagePath 获取主图路径（images 数组第一张）
+func (r *Recipe) GetImagePath() *string {
+	if len(r.Images) > 0 {
+		return &r.Images[0]
+	}
+	return nil
 }
 
 func (Recipe) TableName() string {
@@ -63,7 +70,7 @@ func (Recipe) TableName() string {
 
 // Ingredient 食材表
 type Ingredient struct {
-	ID           uint     `gorm:"primaryKey;autoIncrement" json:"id"`
+	ID           uint     `gorm:"primaryKey;autoIncrement;column:_id" json:"-"`
 	RecipeID     string   `gorm:"not null;index;column:recipe_id" json:"-"`
 	Name         string   `gorm:"not null" json:"name"`
 	Quantity     *float64 `json:"quantity"`
@@ -78,7 +85,7 @@ func (Ingredient) TableName() string {
 
 // Step 步骤表
 type Step struct {
-	ID          uint   `gorm:"primaryKey;autoIncrement" json:"id"`
+	ID          uint   `gorm:"primaryKey;autoIncrement;column:_id" json:"-"`
 	RecipeID    string `gorm:"not null;index;column:recipe_id" json:"-"`
 	Step        int    `gorm:"not null" json:"step"`
 	Description string `gorm:"not null;type:text" json:"description"`
@@ -90,7 +97,7 @@ func (Step) TableName() string {
 
 // AdditionalNote 小贴士表
 type AdditionalNote struct {
-	ID       uint   `gorm:"primaryKey;autoIncrement" json:"id"`
+	ID       uint   `gorm:"primaryKey;autoIncrement;column:_id" json:"-"`
 	RecipeID string `gorm:"not null;index;column:recipe_id" json:"-"`
 	Note     string `gorm:"not null;type:text" json:"note"`
 }

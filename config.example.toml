@@ -26,6 +26,10 @@ allow_headers = ["*"]
 [dashscope]
 api_key = ""
 
+# 和风天气 API 配置 (https://dev.qweather.com/)
+[weather]
+api_key = ""  # 填入和风天气 API Key
+
 [idps.wxmp]
 appid = ""
 secret = ""

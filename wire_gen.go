@@ -10,11 +10,10 @@ import (
 	"choosy-backend/internal/database"
 	"choosy-backend/internal/handlers"
 	"choosy-backend/internal/services"
+
 	"github.com/google/wire"
 	"gorm.io/gorm"
-)
 
-import (
 	_ "choosy-backend/docs"
 )
 
@@ -27,12 +26,16 @@ func InitializeApp() (*App, error) {
 	authHandler := handlers.NewAuthHandler(db)
 	favoriteHandler := handlers.NewFavoriteHandler(db)
 	homeHandler := handlers.NewHomeHandler(db)
+	tagHandler := handlers.NewTagHandler(db)
+	recommendHandler := handlers.NewRecommendHandler(db)
 	app := &App{
-		DB:              db,
-		RecipeHandler:   recipeHandler,
-		AuthHandler:     authHandler,
-		FavoriteHandler: favoriteHandler,
-		HomeHandler:     homeHandler,
+		DB:               db,
+		RecipeHandler:    recipeHandler,
+		AuthHandler:      authHandler,
+		FavoriteHandler:  favoriteHandler,
+		HomeHandler:      homeHandler,
+		TagHandler:       tagHandler,
+		RecommendHandler: recommendHandler,
 	}
 	return app, nil
 }
@@ -40,13 +43,15 @@ func InitializeApp() (*App, error) {
 // wire.go:
 
 // ProviderSet 提供者集合
-var ProviderSet = wire.NewSet(database.Get, services.NewRecipeService, services.NewAuthService, services.NewFavoriteService, handlers.NewRecipeHandler, handlers.NewAuthHandler, handlers.NewFavoriteHandler, handlers.NewHomeHandler)
+var ProviderSet = wire.NewSet(database.Get, services.NewRecipeService, services.NewAuthService, services.NewFavoriteService, services.NewTagService, services.NewRecommendService, handlers.NewRecipeHandler, handlers.NewAuthHandler, handlers.NewFavoriteHandler, handlers.NewHomeHandler, handlers.NewTagHandler, handlers.NewRecommendHandler)
 
 // App 应用依赖容器
 type App struct {
-	DB              *gorm.DB
-	RecipeHandler   *handlers.RecipeHandler
-	AuthHandler     *handlers.AuthHandler
-	FavoriteHandler *handlers.FavoriteHandler
-	HomeHandler     *handlers.HomeHandler
+	DB               *gorm.DB
+	RecipeHandler    *handlers.RecipeHandler
+	AuthHandler      *handlers.AuthHandler
+	FavoriteHandler  *handlers.FavoriteHandler
+	HomeHandler      *handlers.HomeHandler
+	TagHandler       *handlers.TagHandler
+	RecommendHandler *handlers.RecommendHandler
 }

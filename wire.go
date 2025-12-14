@@ -18,19 +18,25 @@ var ProviderSet = wire.NewSet(
 	services.NewRecipeService,
 	services.NewAuthService,
 	services.NewFavoriteService,
+	services.NewTagService,
+	services.NewRecommendService,
 	handlers.NewRecipeHandler,
 	handlers.NewAuthHandler,
 	handlers.NewFavoriteHandler,
 	handlers.NewHomeHandler,
+	handlers.NewTagHandler,
+	handlers.NewRecommendHandler,
 )
 
 // App 应用依赖容器
 type App struct {
-	DB              *gorm.DB
-	RecipeHandler   *handlers.RecipeHandler
-	AuthHandler     *handlers.AuthHandler
-	FavoriteHandler *handlers.FavoriteHandler
-	HomeHandler     *handlers.HomeHandler
+	DB               *gorm.DB
+	RecipeHandler    *handlers.RecipeHandler
+	AuthHandler      *handlers.AuthHandler
+	FavoriteHandler  *handlers.FavoriteHandler
+	HomeHandler      *handlers.HomeHandler
+	TagHandler       *handlers.TagHandler
+	RecommendHandler *handlers.RecommendHandler
 }
 
 // InitializeApp 初始化应用（由 wire 生成）

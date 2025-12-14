@@ -23,8 +23,8 @@ func NewRecipeService(db *gorm.DB) *RecipeService {
 func (s *RecipeService) CreateRecipe(recipe *models.Recipe, ingredients []models.Ingredient, steps []models.Step, notes []string) error {
 	// 检查 ID 是否已存在
 	var existing models.Recipe
-	if err := s.db.First(&existing, "id = ?", recipe.ID).Error; err == nil {
-		return fmt.Errorf("菜谱 ID '%s' 已存在", recipe.ID)
+	if err := s.db.First(&existing, "recipe_id = ?", recipe.RecipeID).Error; err == nil {
+		return fmt.Errorf("菜谱 ID '%s' 已存在", recipe.RecipeID)
 	}
 
 	return s.db.Transaction(func(tx *gorm.DB) error {
@@ -35,7 +35,7 @@ func (s *RecipeService) CreateRecipe(recipe *models.Recipe, ingredients []models
 
 		// 添加食材
 		for i := range ingredients {
-			ingredients[i].RecipeID = recipe.ID
+			ingredients[i].RecipeID = recipe.RecipeID
 		}
 		if len(ingredients) > 0 {
 			if err := tx.Create(&ingredients).Error; err != nil {
@@ -45,7 +45,7 @@ func (s *RecipeService) CreateRecipe(recipe *models.Recipe, ingredients []models
 
 		// 添加步骤
 		for i := range steps {
-			steps[i].RecipeID = recipe.ID
+			steps[i].RecipeID = recipe.RecipeID
 		}
 		if len(steps) > 0 {
 			if err := tx.Create(&steps).Error; err != nil {
@@ -58,7 +58,7 @@ func (s *RecipeService) CreateRecipe(recipe *models.Recipe, ingredients []models
 			additionalNotes := make([]models.AdditionalNote, len(notes))
 			for i, note := range notes {
 				additionalNotes[i] = models.AdditionalNote{
-					RecipeID: recipe.ID,
+					RecipeID: recipe.RecipeID,
 					Note:     note,
 				}
 			}
@@ -80,12 +80,19 @@ func (s *RecipeService) GetRecipe(id string) (*models.Recipe, error) {
 			return db.Order("step ASC")
 		}).
 		Preload("AdditionalNotes").
-		First(&recipe, "id = ?", id).Error
+		First(&recipe, "recipe_id = ?", id).Error
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
-	return &recipe, err
+	if err != nil {
+		return nil, err
+	}
+
+	// 填充标签
+	_ = s.fillTagsForOne(&recipe)
+
+	return &recipe, nil
 }
 
 // GetRecipes 获取菜谱列表
@@ -109,7 +116,14 @@ func (s *RecipeService) GetRecipes(category, search string, limit, offset int) (
 		Limit(limit).
 		Find(&recipes).Error
 
-	return recipes, err
+	if err != nil {
+		return nil, err
+	}
+
+	// 填充标签
+	_ = s.fillTags(recipes)
+
+	return recipes, nil
 }
 
 // RecipeFavoriteCount 菜谱收藏统计
@@ -159,14 +173,14 @@ func (s *RecipeService) GetHotRecipes(limit int, excludeIDs []string) ([]models.
 
 	// 4. 批量查询菜谱详情
 	var recipes []models.Recipe
-	if err := s.db.Where("id IN ?", recipeIDs).Find(&recipes).Error; err != nil {
+	if err := s.db.Where("recipe_id IN ?", recipeIDs).Find(&recipes).Error; err != nil {
 		return nil, err
 	}
 
 	// 5. 按收藏数顺序排序（保持原有顺序）
 	recipeMap := make(map[string]models.Recipe)
 	for _, r := range recipes {
-		recipeMap[r.ID] = r
+		recipeMap[r.RecipeID] = r
 	}
 
 	result := make([]models.Recipe, 0, len(recipeIDs))
@@ -176,6 +190,9 @@ func (s *RecipeService) GetHotRecipes(limit int, excludeIDs []string) ([]models.
 		}
 	}
 
+	// 填充标签
+	_ = s.fillTags(result)
+
 	return result, nil
 }
 
@@ -183,7 +200,7 @@ func (s *RecipeService) GetHotRecipes(limit int, excludeIDs []string) ([]models.
 func (s *RecipeService) UpdateRecipe(id string, updates map[string]interface{}, ingredients []models.Ingredient, steps []models.Step, notes []string, updateIngredients, updateSteps, updateNotes bool) (*models.Recipe, error) {
 	// 检查菜谱是否存在
 	var recipe models.Recipe
-	if err := s.db.First(&recipe, "id = ?", id).Error; err != nil {
+	if err := s.db.First(&recipe, "recipe_id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("菜谱 ID '%s' 不存在", id)
 		}
@@ -248,14 +265,14 @@ func (s *RecipeService) UpdateRecipe(id string, updates map[string]interface{}, 
 				return db.Order("step ASC")
 			}).
 			Preload("AdditionalNotes").
-			First(&recipe, "id = ?", id).Error
+			First(&recipe, "recipe_id = ?", id).Error
 	})
 }
 
 // DeleteRecipe 删除菜谱
 func (s *RecipeService) DeleteRecipe(id string) error {
 	var recipe models.Recipe
-	if err := s.db.First(&recipe, "id = ?", id).Error; err != nil {
+	if err := s.db.First(&recipe, "recipe_id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("菜谱 ID '%s' 不存在", id)
 		}
@@ -327,4 +344,49 @@ func (s *RecipeService) CreateRecipesBatch(recipes []models.Recipe, ingredientsL
 	}
 
 	return created, nil
+}
+
+// fillTags 批量填充菜谱的标签
+func (s *RecipeService) fillTags(recipes []models.Recipe) error {
+	if len(recipes) == 0 {
+		return nil
+	}
+
+	// 收集所有菜谱 ID
+	recipeIDs := make([]string, len(recipes))
+	for i, r := range recipes {
+		recipeIDs[i] = r.RecipeID
+	}
+
+	// 直接查询 tags 表
+	var tags []models.Tag
+	if err := s.db.Where("recipe_id IN ?", recipeIDs).Find(&tags).Error; err != nil {
+		return err
+	}
+
+	// 构建 recipeID -> []Tag 映射
+	recipeTagsMap := make(map[string][]models.Tag)
+	for _, t := range tags {
+		recipeTagsMap[t.RecipeID] = append(recipeTagsMap[t.RecipeID], t)
+	}
+
+	// 填充到菜谱
+	for i := range recipes {
+		recipes[i].Tags = recipeTagsMap[recipes[i].RecipeID]
+	}
+
+	return nil
+}
+
+// fillTagsForOne 填充单个菜谱的标签
+func (s *RecipeService) fillTagsForOne(recipe *models.Recipe) error {
+	if recipe == nil {
+		return nil
+	}
+	recipes := []models.Recipe{*recipe}
+	if err := s.fillTags(recipes); err != nil {
+		return err
+	}
+	recipe.Tags = recipes[0].Tags
+	return nil
 }

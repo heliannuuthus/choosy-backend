@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"choosy-backend/internal/config"
+	"choosy-backend/internal/handlers"
 	"choosy-backend/internal/logger"
 	"choosy-backend/internal/middleware"
 
@@ -84,8 +85,8 @@ func main() {
 		// 菜谱路由
 		recipes := api.Group("/recipes")
 		{
-			recipes.POST("/", app.RecipeHandler.CreateRecipe)
-			recipes.GET("/", app.RecipeHandler.GetRecipes)
+			recipes.POST("", app.RecipeHandler.CreateRecipe)
+			recipes.GET("", app.RecipeHandler.GetRecipes)
 			recipes.GET("/categories/list", app.RecipeHandler.GetCategories)
 			recipes.POST("/batch", app.RecipeHandler.CreateRecipesBatch)
 			recipes.GET("/:recipe_id", app.RecipeHandler.GetRecipe)
@@ -97,8 +98,8 @@ func main() {
 		favorites := api.Group("/favorites")
 		favorites.Use(middleware.RequireAuth())
 		{
-			favorites.GET("/", app.FavoriteHandler.GetFavorites)
-			favorites.POST("/", app.FavoriteHandler.AddFavorite)
+			favorites.GET("", app.FavoriteHandler.GetFavorites)
+			favorites.POST("", app.FavoriteHandler.AddFavorite)
 			favorites.POST("/batch-check", app.FavoriteHandler.BatchCheckFavorites)
 			favorites.GET("/:recipe_id/check", app.FavoriteHandler.CheckFavorite)
 			favorites.DELETE("/:recipe_id", app.FavoriteHandler.RemoveFavorite)
@@ -107,7 +108,25 @@ func main() {
 		// 首页路由
 		home := api.Group("/home")
 		{
-			home.GET("/config", app.HomeHandler.GetHomeConfig)
+			home.GET("/banners", app.HomeHandler.GetBanners)
+			home.GET("/recommend", app.HomeHandler.GetRecommendRecipes)
+			home.GET("/hot", app.HomeHandler.GetHotRecipes)
+		}
+
+		// 标签路由
+		tags := api.Group("/tags")
+		{
+			tags.GET("/cuisines", app.TagHandler.GetCuisines)
+			tags.GET("/flavors", app.TagHandler.GetFlavors)
+			tags.GET("/scenes", app.TagHandler.GetScenes)
+		}
+
+		// 推荐路由（需要登录）
+		contextHandler := handlers.NewContextHandler()
+		recommend := api.Group("/recommend")
+		recommend.Use(middleware.RequireAuth())
+		{
+			recommend.POST("/context", contextHandler.GetContext)
 		}
 	}
 

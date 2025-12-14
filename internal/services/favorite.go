@@ -33,7 +33,7 @@ func generateFavoriteID() string {
 func (s *FavoriteService) AddFavorite(openID, recipeID string) (*models.Favorite, error) {
 	// 检查菜谱是否存在
 	var recipe models.Recipe
-	if err := s.db.First(&recipe, "id = ?", recipeID).Error; err != nil {
+	if err := s.db.First(&recipe, "recipe_id = ?", recipeID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("菜谱不存在")
 		}
@@ -51,9 +51,8 @@ func (s *FavoriteService) AddFavorite(openID, recipeID string) (*models.Favorite
 		return nil, err
 	}
 
-	// 创建收藏
+	// 创建收藏（ID 自增，无需手动设置）
 	favorite := models.Favorite{
-		ID:        generateFavoriteID(),
 		OpenID:    openID,
 		RecipeID:  recipeID,
 		CreatedAt: time.Now(),
@@ -107,14 +106,14 @@ func (s *FavoriteService) GetFavorites(openID, category, search string, limit, o
 
 	// 3. 批量查询菜谱详情
 	var recipes []models.Recipe
-	if err := s.db.Where("id IN ?", recipeIDs).Find(&recipes).Error; err != nil {
+	if err := s.db.Where("recipe_id IN ?", recipeIDs).Find(&recipes).Error; err != nil {
 		return nil, 0, err
 	}
 
 	// 4. 构建菜谱 map
 	recipeMap := make(map[string]*models.Recipe)
 	for i := range recipes {
-		recipeMap[recipes[i].ID] = &recipes[i]
+		recipeMap[recipes[i].RecipeID] = &recipes[i]
 	}
 
 	// 5. 在内存中筛选和关联

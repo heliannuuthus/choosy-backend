@@ -29,14 +29,12 @@ type FavoriteRequest struct {
 
 // FavoriteResponse 收藏响应
 type FavoriteResponse struct {
-	ID        string `json:"id"`
 	RecipeID  string `json:"recipe_id"`
 	CreatedAt string `json:"created_at"`
 }
 
 // FavoriteListItem 收藏列表项
 type FavoriteListItem struct {
-	ID        string          `json:"id"`
 	RecipeID  string          `json:"recipe_id"`
 	CreatedAt string          `json:"created_at"`
 	Recipe    *RecipeListItem `json:"recipe,omitempty"`
@@ -96,7 +94,6 @@ func (h *FavoriteHandler) AddFavorite(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, FavoriteResponse{
-		ID:        favorite.ID,
 		RecipeID:  favorite.RecipeID,
 		CreatedAt: favorite.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	})
@@ -203,20 +200,19 @@ func (h *FavoriteHandler) GetFavorites(c *gin.Context) {
 	items := make([]FavoriteListItem, len(favorites))
 	for i, f := range favorites {
 		item := FavoriteListItem{
-			ID:        f.ID,
 			RecipeID:  f.RecipeID,
 			CreatedAt: f.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 
 		if f.Recipe != nil {
 			item.Recipe = &RecipeListItem{
-				ID:               f.Recipe.ID,
+				ID:               f.Recipe.RecipeID,
 				Name:             f.Recipe.Name,
 				Description:      f.Recipe.Description,
 				Category:         f.Recipe.Category,
 				Difficulty:       f.Recipe.Difficulty,
-				Tags:             f.Recipe.Tags,
-				ImagePath:        f.Recipe.ImagePath,
+				Tags:             GroupTags(f.Recipe.Tags),
+				ImagePath:        f.Recipe.GetImagePath(),
 				TotalTimeMinutes: f.Recipe.TotalTimeMinutes,
 			}
 		}

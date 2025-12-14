@@ -237,8 +237,7 @@ func (h *AuthHandler) Revoke(c *gin.Context) {
 
 // UserProfile 用户信息响应
 type UserProfile struct {
-	OpenID   string `json:"openid"`             // 微信 openid
-	UID      string `json:"uid"`                // hash(openid)
+	OpenID   string `json:"openid"`             // 系统生成的唯一标识（对外 ID）
 	Nickname string `json:"nickname,omitempty"` // 昵称
 	Avatar   string `json:"avatar,omitempty"`   // 头像
 }
@@ -270,7 +269,6 @@ func (h *AuthHandler) Profile(c *gin.Context) {
 
 	c.JSON(http.StatusOK, UserProfile{
 		OpenID:   dbUser.OpenID,
-		UID:      dbUser.ID,
 		Nickname: dbUser.Nickname,
 		Avatar:   dbUser.Avatar,
 	})
@@ -337,7 +335,6 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 
 	c.JSON(http.StatusOK, UserProfile{
 		OpenID:   dbUser.OpenID,
-		UID:      dbUser.ID,
 		Nickname: dbUser.Nickname,
 		Avatar:   dbUser.Avatar,
 	})

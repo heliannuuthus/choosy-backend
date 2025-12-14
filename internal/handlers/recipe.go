@@ -6,6 +6,7 @@ import (
 
 	"choosy-backend/internal/models"
 	"choosy-backend/internal/services"
+	"choosy-backend/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -25,14 +26,14 @@ func NewRecipeHandler(db *gorm.DB) *RecipeHandler {
 
 // 分类中文名称映射
 var categoryNames = map[string]string{
-	"aquatic":       "水产",
-	"breakfast":     "早餐",
-	"condiment":     "调味品",
-	"drink":         "饮品",
-	"meat_dish":     "肉类",
-	"semi-finished": "半成品",
-	"soup":          "汤类",
-	"staple":        "主食",
+	"aquatic":        "水产",
+	"breakfast":      "早餐",
+	"condiment":      "调味品",
+	"drink":          "饮品",
+	"meat_dish":      "肉类",
+	"semi-finished":  "半成品",
+	"soup":           "汤类",
+	"staple":         "主食",
 	"vegetable_dish": "素菜",
 }
 
@@ -53,11 +54,9 @@ type StepRequest struct {
 
 // RecipeCreateRequest 创建菜谱请求
 type RecipeCreateRequest struct {
-	ID               string              `json:"id" binding:"required"`
+	ID               string              `json:"id"` // 可选，不提供则自动生成
 	Name             string              `json:"name" binding:"required"`
 	Description      *string             `json:"description"`
-	SourcePath       *string             `json:"source_path"`
-	ImagePath        *string             `json:"image_path"`
 	Images           []string            `json:"images"`
 	Category         string              `json:"category" binding:"required"`
 	Difficulty       int                 `json:"difficulty" binding:"required"`
@@ -73,50 +72,54 @@ type RecipeCreateRequest struct {
 
 // RecipeUpdateRequest 更新菜谱请求
 type RecipeUpdateRequest struct {
-	Name             *string             `json:"name"`
-	Description      *string             `json:"description"`
-	SourcePath       *string             `json:"source_path"`
-	ImagePath        *string             `json:"image_path"`
-	Images           *[]string           `json:"images"`
-	Category         *string             `json:"category"`
-	Difficulty       *int                `json:"difficulty"`
-	Tags             *[]string           `json:"tags"`
-	Servings         *int                `json:"servings"`
-	PrepTimeMinutes  *int                `json:"prep_time_minutes"`
-	CookTimeMinutes  *int                `json:"cook_time_minutes"`
-	TotalTimeMinutes *int                `json:"total_time_minutes"`
+	Name             *string              `json:"name"`
+	Description      *string              `json:"description"`
+	Images           *[]string            `json:"images"`
+	Category         *string              `json:"category"`
+	Difficulty       *int                 `json:"difficulty"`
+	Tags             *[]string            `json:"tags"`
+	Servings         *int                 `json:"servings"`
+	PrepTimeMinutes  *int                 `json:"prep_time_minutes"`
+	CookTimeMinutes  *int                 `json:"cook_time_minutes"`
+	TotalTimeMinutes *int                 `json:"total_time_minutes"`
 	Ingredients      *[]IngredientRequest `json:"ingredients"`
 	Steps            *[]StepRequest       `json:"steps"`
-	AdditionalNotes  *[]string           `json:"additional_notes"`
+	AdditionalNotes  *[]string            `json:"additional_notes"`
+}
+
+// TagsGrouped 分组的标签
+type TagsGrouped struct {
+	Cuisines []string `json:"cuisines"`
+	Flavors  []string `json:"flavors"`
+	Scenes   []string `json:"scenes"`
 }
 
 // RecipeListItem 菜谱列表项
 type RecipeListItem struct {
-	ID               string   `json:"id"`
-	Name             string   `json:"name"`
-	Description      *string  `json:"description"`
-	Category         string   `json:"category"`
-	Difficulty       int      `json:"difficulty"`
-	Tags             []string `json:"tags"`
-	ImagePath        *string  `json:"image_path"`
-	TotalTimeMinutes *int     `json:"total_time_minutes"`
+	ID               string       `json:"id"`
+	Name             string       `json:"name"`
+	Description      *string      `json:"description"`
+	Category         string       `json:"category"`
+	Difficulty       int          `json:"difficulty"`
+	Tags             TagsGrouped  `json:"tags"`
+	ImagePath        *string      `json:"image_path"`
+	TotalTimeMinutes *int         `json:"total_time_minutes"`
 }
 
 // RecipeResponse 菜谱响应
 type RecipeResponse struct {
-	ID               string        `json:"id"`
-	Name             string        `json:"name"`
-	Description      *string       `json:"description"`
-	SourcePath       *string       `json:"source_path"`
-	ImagePath        *string       `json:"image_path"`
-	Images           []string      `json:"images"`
-	Category         string        `json:"category"`
-	Difficulty       int           `json:"difficulty"`
-	Tags             []string      `json:"tags"`
-	Servings         int           `json:"servings"`
-	PrepTimeMinutes  *int          `json:"prep_time_minutes"`
-	CookTimeMinutes  *int          `json:"cook_time_minutes"`
-	TotalTimeMinutes *int          `json:"total_time_minutes"`
+	ID               string               `json:"id"`
+	Name             string               `json:"name"`
+	Description      *string              `json:"description"`
+	Images           []string             `json:"images"`
+	ImagePath        *string              `json:"image_path"` // images[0]，兼容前端
+	Category         string               `json:"category"`
+	Difficulty       int                  `json:"difficulty"`
+	Tags             TagsGrouped          `json:"tags"`
+	Servings         int                  `json:"servings"`
+	PrepTimeMinutes  *int                 `json:"prep_time_minutes"`
+	CookTimeMinutes  *int                 `json:"cook_time_minutes"`
+	TotalTimeMinutes *int                 `json:"total_time_minutes"`
 	Ingredients      []IngredientResponse `json:"ingredients"`
 	Steps            []StepResponse       `json:"steps"`
 	AdditionalNotes  []string             `json:"additional_notes"`
@@ -161,17 +164,20 @@ func (h *RecipeHandler) CreateRecipe(c *gin.Context) {
 		return
 	}
 
-	// 转换为模型
+	// 自动生成 ID（如果未提供）
+	recipeID := req.ID
+	if recipeID == "" {
+		recipeID = utils.GenerateRecipeID()
+	}
+
+	// 转换为模型 (Tags 通过关联表管理，不在这里设置)
 	recipe := models.Recipe{
-		ID:               req.ID,
+		RecipeID:         recipeID,
 		Name:             req.Name,
 		Description:      req.Description,
-		SourcePath:       req.SourcePath,
-		ImagePath:        req.ImagePath,
 		Images:           req.Images,
 		Category:         req.Category,
 		Difficulty:       req.Difficulty,
-		Tags:             req.Tags,
 		Servings:         req.Servings,
 		PrepTimeMinutes:  req.PrepTimeMinutes,
 		CookTimeMinutes:  req.CookTimeMinutes,
@@ -203,7 +209,7 @@ func (h *RecipeHandler) CreateRecipe(c *gin.Context) {
 	}
 
 	// 重新获取完整的菜谱
-	createdRecipe, _ := h.service.GetRecipe(recipe.ID)
+	createdRecipe, _ := h.service.GetRecipe(recipe.RecipeID)
 	c.JSON(http.StatusCreated, h.toRecipeResponse(createdRecipe))
 }
 
@@ -243,13 +249,13 @@ func (h *RecipeHandler) GetRecipes(c *gin.Context) {
 	items := make([]RecipeListItem, len(recipes))
 	for i, r := range recipes {
 		items[i] = RecipeListItem{
-			ID:               r.ID,
+			ID:               r.RecipeID,
 			Name:             r.Name,
 			Description:      r.Description,
 			Category:         r.Category,
 			Difficulty:       r.Difficulty,
-			Tags:             r.Tags,
-			ImagePath:        r.ImagePath,
+			Tags:             GroupTags(r.Tags),
+			ImagePath:        r.GetImagePath(),
 			TotalTimeMinutes: r.TotalTimeMinutes,
 		}
 	}
@@ -309,12 +315,6 @@ func (h *RecipeHandler) UpdateRecipe(c *gin.Context) {
 	if req.Description != nil {
 		updates["description"] = *req.Description
 	}
-	if req.SourcePath != nil {
-		updates["source_path"] = *req.SourcePath
-	}
-	if req.ImagePath != nil {
-		updates["image_path"] = *req.ImagePath
-	}
 	if req.Images != nil {
 		updates["images"] = models.StringSlice(*req.Images)
 	}
@@ -324,9 +324,7 @@ func (h *RecipeHandler) UpdateRecipe(c *gin.Context) {
 	if req.Difficulty != nil {
 		updates["difficulty"] = *req.Difficulty
 	}
-	if req.Tags != nil {
-		updates["tags"] = models.StringSlice(*req.Tags)
-	}
+	// Tags 通过关联表管理，暂不支持通过 API 更新
 	if req.Servings != nil {
 		updates["servings"] = *req.Servings
 	}
@@ -464,16 +462,17 @@ func (h *RecipeHandler) CreateRecipesBatch(c *gin.Context) {
 	notesList := make([][]string, len(reqs))
 
 	for i, req := range reqs {
+		recipeID := req.ID
+		if recipeID == "" {
+			recipeID = utils.GenerateRecipeID()
+		}
 		recipes[i] = models.Recipe{
-			ID:               req.ID,
+			RecipeID:         recipeID,
 			Name:             req.Name,
 			Description:      req.Description,
-			SourcePath:       req.SourcePath,
-			ImagePath:        req.ImagePath,
 			Images:           req.Images,
 			Category:         req.Category,
 			Difficulty:       req.Difficulty,
-			Tags:             req.Tags,
 			Servings:         req.Servings,
 			PrepTimeMinutes:  req.PrepTimeMinutes,
 			CookTimeMinutes:  req.CookTimeMinutes,
@@ -513,13 +512,33 @@ func (h *RecipeHandler) CreateRecipesBatch(c *gin.Context) {
 	// 转换响应
 	responses := make([]RecipeResponse, len(created))
 	for i, r := range created {
-		recipe, _ := h.service.GetRecipe(r.ID)
+		recipe, _ := h.service.GetRecipe(r.RecipeID)
 		if recipe != nil {
 			responses[i] = *h.toRecipeResponse(recipe)
 		}
 	}
 
 	c.JSON(http.StatusCreated, responses)
+}
+
+// GroupTags 将 []models.Tag 按类型分组
+func GroupTags(tags []models.Tag) TagsGrouped {
+	result := TagsGrouped{
+		Cuisines: []string{},
+		Flavors:  []string{},
+		Scenes:   []string{},
+	}
+	for _, t := range tags {
+		switch t.Type {
+		case models.TagTypeCuisine:
+			result.Cuisines = append(result.Cuisines, t.Label)
+		case models.TagTypeFlavor:
+			result.Flavors = append(result.Flavors, t.Label)
+		case models.TagTypeScene:
+			result.Scenes = append(result.Scenes, t.Label)
+		}
+	}
+	return result
 }
 
 // toRecipeResponse 转换为响应格式
@@ -559,18 +578,14 @@ func (h *RecipeHandler) toRecipeResponse(r *models.Recipe) *RecipeResponse {
 		images = []string{}
 	}
 
-	tags := r.Tags
-	if tags == nil {
-		tags = []string{}
-	}
+	tags := GroupTags(r.Tags)
 
 	return &RecipeResponse{
-		ID:               r.ID,
+		ID:               r.RecipeID,
 		Name:             r.Name,
 		Description:      r.Description,
-		SourcePath:       r.SourcePath,
-		ImagePath:        r.ImagePath,
 		Images:           images,
+		ImagePath:        r.GetImagePath(),
 		Category:         r.Category,
 		Difficulty:       r.Difficulty,
 		Tags:             tags,

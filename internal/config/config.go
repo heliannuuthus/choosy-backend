@@ -58,7 +58,7 @@ func Load() {
 		if len(changes) > 0 {
 			fmt.Printf("[config] 配置热更新: %s\n", e.Name)
 			for _, change := range changes {
-				fmt.Printf("[config]   %s: %v -> %v\n", change.Key, change.OldValue, change.NewValue)
+				fmt.Printf("[config]   %s (已更新)\n", change.Key)
 			}
 		}
 

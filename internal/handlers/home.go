@@ -3,6 +3,7 @@ package handlers
 import (
 	"math/rand"
 	"net/http"
+	"strconv"
 	"time"
 
 	"choosy-backend/internal/config"
@@ -33,38 +34,53 @@ type BannerItem struct {
 	LinkType string `json:"link_type,omitempty"` // recipe, url, none
 }
 
-// HomeConfigResponse 首页配置响应
-type HomeConfigResponse struct {
-	Banners          []BannerItem     `json:"banners"`
-	RecommendRecipes []RecipeListItem `json:"recommend_recipes"`
-	HotRecipes       []RecipeListItem `json:"hot_recipes"`
-}
-
-// GetHomeConfig 获取首页配置
-// @Summary 获取首页配置
+// GetBanners 获取首页 Banner
+// @Summary 获取首页 Banner
 // @Tags home
 // @Produce json
-// @Success 200 {object} HomeConfigResponse
-// @Router /api/home/config [get]
-func (h *HomeHandler) GetHomeConfig(c *gin.Context) {
-	// 从配置文件读取 banners
+// @Success 200 {array} BannerItem
+// @Router /api/home/banners [get]
+func (h *HomeHandler) GetBanners(c *gin.Context) {
 	banners := h.loadBannersFromConfig()
+	c.JSON(http.StatusOK, banners)
+}
 
-	// 获取热门菜谱（按收藏数排序，取前 6 个）
-	hotRecipes := h.getHotRecipes(6)
-
-	// 获取推荐菜谱（随机 4 个，排除热门）
-	excludeIDs := make([]string, len(hotRecipes))
-	for i, r := range hotRecipes {
-		excludeIDs[i] = r.ID
+// GetRecommendRecipes 获取推荐菜谱
+// @Summary 获取推荐菜谱（随机）
+// @Tags home
+// @Produce json
+// @Param limit query int false "数量限制" default(4)
+// @Success 200 {array} RecipeListItem
+// @Router /api/home/recommend [get]
+func (h *HomeHandler) GetRecommendRecipes(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "4"))
+	if limit < 1 {
+		limit = 1
+	} else if limit > 20 {
+		limit = 20
 	}
-	recommendRecipes := h.getRandomRecipesExclude(4, excludeIDs)
 
-	c.JSON(http.StatusOK, HomeConfigResponse{
-		Banners:          banners,
-		RecommendRecipes: recommendRecipes,
-		HotRecipes:       hotRecipes,
-	})
+	recipes := h.getRandomRecipes(limit)
+	c.JSON(http.StatusOK, recipes)
+}
+
+// GetHotRecipes 获取热门菜谱
+// @Summary 获取热门菜谱（按收藏数排序）
+// @Tags home
+// @Produce json
+// @Param limit query int false "数量限制" default(6)
+// @Success 200 {array} RecipeListItem
+// @Router /api/home/hot [get]
+func (h *HomeHandler) GetHotRecipes(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "6"))
+	if limit < 1 {
+		limit = 1
+	} else if limit > 20 {
+		limit = 20
+	}
+
+	recipes := h.getHotRecipes(limit)
+	c.JSON(http.StatusOK, recipes)
 }
 
 // loadBannersFromConfig 从配置文件加载 banners
@@ -137,13 +153,13 @@ func (h *HomeHandler) getHotRecipes(count int) []RecipeListItem {
 	items := make([]RecipeListItem, len(recipes))
 	for i, r := range recipes {
 		items[i] = RecipeListItem{
-			ID:               r.ID,
+			ID:               r.RecipeID,
 			Name:             r.Name,
 			Description:      r.Description,
 			Category:         r.Category,
 			Difficulty:       r.Difficulty,
-			Tags:             r.Tags,
-			ImagePath:        r.ImagePath,
+			Tags:             GroupTags(r.Tags),
+			ImagePath:        r.GetImagePath(),
 			TotalTimeMinutes: r.TotalTimeMinutes,
 		}
 	}
@@ -151,46 +167,38 @@ func (h *HomeHandler) getHotRecipes(count int) []RecipeListItem {
 	return items
 }
 
-// getRandomRecipesExclude 获取随机菜谱（排除指定 ID）
-func (h *HomeHandler) getRandomRecipesExclude(count int, excludeIDs []string) []RecipeListItem {
+// getRandomRecipes 获取随机菜谱
+func (h *HomeHandler) getRandomRecipes(count int) []RecipeListItem {
 	recipes, _ := h.recipeService.GetRecipes("", "", 100, 0)
 	if len(recipes) == 0 {
 		return []RecipeListItem{}
 	}
 
-	// 构建排除 ID 集合
-	excludeMap := make(map[string]bool)
-	for _, id := range excludeIDs {
-		excludeMap[id] = true
-	}
-
-	// 过滤掉已排除的
-	var filtered []RecipeListItem
+	// 转换为 RecipeListItem
+	var items []RecipeListItem
 	for _, r := range recipes {
-		if !excludeMap[r.ID] {
-			filtered = append(filtered, RecipeListItem{
-				ID:               r.ID,
-				Name:             r.Name,
-				Description:      r.Description,
-				Category:         r.Category,
-				Difficulty:       r.Difficulty,
-				Tags:             r.Tags,
-				ImagePath:        r.ImagePath,
-				TotalTimeMinutes: r.TotalTimeMinutes,
-			})
-		}
+		items = append(items, RecipeListItem{
+			ID:               r.RecipeID,
+			Name:             r.Name,
+			Description:      r.Description,
+			Category:         r.Category,
+			Difficulty:       r.Difficulty,
+			Tags:             GroupTags(r.Tags),
+			ImagePath:        r.GetImagePath(),
+			TotalTimeMinutes: r.TotalTimeMinutes,
+		})
 	}
 
 	// 随机打乱
 	rand.Seed(time.Now().UnixNano())
-	rand.Shuffle(len(filtered), func(i, j int) {
-		filtered[i], filtered[j] = filtered[j], filtered[i]
+	rand.Shuffle(len(items), func(i, j int) {
+		items[i], items[j] = items[j], items[i]
 	})
 
 	// 取前 count 个
-	if len(filtered) > count {
-		filtered = filtered[:count]
+	if len(items) > count {
+		items = items[:count]
 	}
 
-	return filtered
+	return items
 }

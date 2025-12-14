@@ -368,9 +368,8 @@ func GenerateTokenPair(db *gorm.DB, tOpenID, nickname, avatar string) (*TokenPai
 	// 清理旧的 refresh_token（用 openid 关联）
 	cleanupOldRefreshTokens(db, user.OpenID)
 
-	// 存储 refresh_token
+	// 存储 refresh_token（ID 自增，无需手动设置）
 	dbToken := models.RefreshToken{
-		ID:        generateID(),
 		OpenID:    user.OpenID,
 		Token:     refreshToken,
 		ExpiresAt: expiresAt,
@@ -404,11 +403,10 @@ func upsertUser(db *gorm.DB, tOpenID, nickname, avatar string) (*models.User, er
 		return nil, err
 	}
 
-	// 新用户，创建记录
+	// 新用户，创建记录（ID 自增，OpenID 作为对外标识）
 	now := time.Now()
 	user = models.User{
-		ID:        generateID(),
-		OpenID:    generateID(), // 系统生成的唯一标识
+		OpenID:    generateID(), // 系统生成的唯一标识，对外 ID
 		TOpenID:   tOpenID,
 		Nickname:  nickname,
 		Avatar:    avatar,

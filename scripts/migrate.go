@@ -51,7 +51,7 @@ func (s *StringSlice) Scan(value interface{}) error {
 
 // User 用户信息
 type User struct {
-	ID        string    `gorm:"primaryKey;column:_id;size:32"`
+	ID        uint      `gorm:"primaryKey;autoIncrement;column:_id"`
 	OpenID    string    `gorm:"not null;uniqueIndex;column:openid;size:64"`
 	TOpenID   string    `gorm:"not null;uniqueIndex;column:t_openid;size:64"`
 	Nickname  string    `gorm:"not null;column:nickname;size:64"`
@@ -66,7 +66,7 @@ func (User) TableName() string {
 
 // RefreshToken 刷新令牌
 type RefreshToken struct {
-	ID        string    `gorm:"primaryKey;column:_id;size:32"`
+	ID        uint      `gorm:"primaryKey;autoIncrement;column:_id"`
 	OpenID    string    `gorm:"not null;index;column:openid;size:64"`
 	Token     string    `gorm:"not null;uniqueIndex;size:128"`
 	ExpiresAt time.Time `gorm:"not null;column:expires_at"`
@@ -80,15 +80,13 @@ func (RefreshToken) TableName() string {
 
 // Recipe 菜谱
 type Recipe struct {
-	ID               string      `gorm:"primaryKey;column:id"`
-	Name             string      `gorm:"not null;index"`
+	ID               uint        `gorm:"primaryKey;autoIncrement;column:_id"`
+	RecipeID         string      `gorm:"uniqueIndex;not null;column:recipe_id;size:32"`
+	Name             string      `gorm:"uniqueIndex;not null;size:128"`
 	Description      *string     `gorm:"type:text"`
-	SourcePath       *string     `gorm:"column:source_path"`
-	ImagePath        *string     `gorm:"column:image_path"`
 	Images           StringSlice `gorm:"type:json;default:'[]'"`
 	Category         string      `gorm:"index"`
 	Difficulty       int
-	Tags             StringSlice `gorm:"type:json;default:'[]'"`
 	Servings         int
 	PrepTimeMinutes  *int `gorm:"column:prep_time_minutes"`
 	CookTimeMinutes  *int `gorm:"column:cook_time_minutes"`
@@ -101,12 +99,12 @@ func (Recipe) TableName() string {
 
 // Ingredient 食材
 type Ingredient struct {
-	ID           uint   `gorm:"primaryKey;autoIncrement"`
-	RecipeID     string `gorm:"not null;index;column:recipe_id"`
-	Name         string `gorm:"not null"`
+	ID           uint   `gorm:"primaryKey;autoIncrement;column:_id"`
+	RecipeID     string `gorm:"not null;index;column:recipe_id;size:16"`
+	Name         string `gorm:"not null;size:64"`
 	Quantity     *float64
-	Unit         *string
-	TextQuantity string `gorm:"not null;column:text_quantity"`
+	Unit         *string `gorm:"size:16"`
+	TextQuantity string  `gorm:"not null;column:text_quantity;size:32"`
 	Notes        *string
 }
 
@@ -116,8 +114,8 @@ func (Ingredient) TableName() string {
 
 // Step 步骤
 type Step struct {
-	ID          uint   `gorm:"primaryKey;autoIncrement"`
-	RecipeID    string `gorm:"not null;index;column:recipe_id"`
+	ID          uint   `gorm:"primaryKey;autoIncrement;column:_id"`
+	RecipeID    string `gorm:"not null;index;column:recipe_id;size:16"`
 	Step        int    `gorm:"not null"`
 	Description string `gorm:"not null;type:text"`
 }
@@ -128,8 +126,8 @@ func (Step) TableName() string {
 
 // AdditionalNote 小贴士
 type AdditionalNote struct {
-	ID       uint   `gorm:"primaryKey;autoIncrement"`
-	RecipeID string `gorm:"not null;index;column:recipe_id"`
+	ID       uint   `gorm:"primaryKey;autoIncrement;column:_id"`
+	RecipeID string `gorm:"not null;index;column:recipe_id;size:16"`
 	Note     string `gorm:"not null;type:text"`
 }
 
@@ -139,14 +137,27 @@ func (AdditionalNote) TableName() string {
 
 // Favorite 收藏
 type Favorite struct {
-	ID        string    `gorm:"primaryKey;column:id;size:32"`
+	ID        uint      `gorm:"primaryKey;autoIncrement;column:_id"`
 	OpenID    string    `gorm:"not null;index:idx_favorite_user;column:openid;size:64"`
-	RecipeID  string    `gorm:"not null;index:idx_favorite_recipe;column:recipe_id;size:64"`
+	RecipeID  string    `gorm:"not null;index:idx_favorite_recipe;column:recipe_id;size:16"`
 	CreatedAt time.Time `gorm:"not null;column:created_at"`
 }
 
 func (Favorite) TableName() string {
 	return "favorites"
+}
+
+// Tag 标签（直接关联菜谱）
+type Tag struct {
+	ID       uint   `gorm:"primaryKey;autoIncrement;column:_id"`
+	RecipeID string `gorm:"not null;index;column:recipe_id;size:16"`
+	Value    string `gorm:"not null;index;size:50"`
+	Label    string `gorm:"not null;size:50"`
+	Type     string `gorm:"not null;index;size:20"`
+}
+
+func (Tag) TableName() string {
+	return "tags"
 }
 
 func main() {
@@ -183,6 +194,7 @@ func main() {
 		&Step{},
 		&AdditionalNote{},
 		&Favorite{},
+		&Tag{},
 	); err != nil {
 		log.Fatalf("迁移失败: %v", err)
 	}
