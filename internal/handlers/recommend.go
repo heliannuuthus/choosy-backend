@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"choosy-backend/internal/services"
+	"choosy-backend/internal/recommend"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -13,24 +13,22 @@ import (
 
 // RecommendHandler 推荐处理器
 type RecommendHandler struct {
-	service *services.RecommendService
+	service *recommend.Service
 }
 
 // NewRecommendHandler 创建推荐处理器
 func NewRecommendHandler(db *gorm.DB) *RecommendHandler {
 	return &RecommendHandler{
-		service: services.NewRecommendService(db),
+		service: recommend.NewService(db),
 	}
 }
 
-// RecommendRequest 推荐请求
 type RecommendRequest struct {
-	Latitude  float64 `json:"latitude" binding:"required"`  // 纬度
-	Longitude float64 `json:"longitude" binding:"required"` // 经度
-	Timestamp int64   `json:"timestamp"`                    // 时间戳 (毫秒)，可选
+	Latitude  float64 `json:"latitude" binding:"required"`
+	Longitude float64 `json:"longitude" binding:"required"`
+	Timestamp int64   `json:"timestamp"`
 }
 
-// RecommendResponse 推荐响应
 type RecommendResponse struct {
 	Recipes     []RecipeListItem `json:"recipes"`
 	Reason      string           `json:"reason"`
@@ -40,7 +38,6 @@ type RecommendResponse struct {
 	Temperature string           `json:"temperature"`
 }
 
-// WeatherResponse 天气响应
 type WeatherResponse struct {
 	Temperature float64 `json:"temperature"`
 	Humidity    int     `json:"humidity"`
@@ -66,12 +63,10 @@ func (h *RecommendHandler) GetRecommendations(c *gin.Context) {
 		return
 	}
 
-	// 默认时间为当前时间
 	if req.Timestamp == 0 {
 		req.Timestamp = time.Now().UnixMilli()
 	}
 
-	// 获取 limit 参数
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "6"))
 	if limit < 1 {
 		limit = 1
@@ -79,21 +74,18 @@ func (h *RecommendHandler) GetRecommendations(c *gin.Context) {
 		limit = 20
 	}
 
-	// 构建推荐上下文
-	ctx := &services.RecommendContext{
+	ctx := &recommend.Context{
 		Latitude:  req.Latitude,
 		Longitude: req.Longitude,
 		Timestamp: req.Timestamp,
 	}
 
-	// 获取推荐结果
 	result, err := h.service.GetRecommendations(ctx, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"detail": err.Error()})
 		return
 	}
 
-	// 转换响应格式
 	response := RecommendResponse{
 		Recipes:     make([]RecipeListItem, len(result.Recipes)),
 		Reason:      result.Reason,
@@ -102,7 +94,6 @@ func (h *RecommendHandler) GetRecommendations(c *gin.Context) {
 		Temperature: result.Temperature,
 	}
 
-	// 转换天气信息
 	if result.Weather != nil {
 		response.Weather = &WeatherResponse{
 			Temperature: result.Weather.Temperature,
@@ -112,7 +103,6 @@ func (h *RecommendHandler) GetRecommendations(c *gin.Context) {
 		}
 	}
 
-	// 转换菜谱列表
 	for i, r := range result.Recipes {
 		response.Recipes[i] = RecipeListItem{
 			ID:               r.RecipeID,

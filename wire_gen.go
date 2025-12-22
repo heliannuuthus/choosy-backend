@@ -9,9 +9,7 @@ package main
 import (
 	"choosy-backend/internal/database"
 	"choosy-backend/internal/handlers"
-	"choosy-backend/internal/services"
 
-	"github.com/google/wire"
 	"gorm.io/gorm"
 
 	_ "choosy-backend/docs"
@@ -39,11 +37,6 @@ func InitializeApp() (*App, error) {
 	}
 	return app, nil
 }
-
-// wire.go:
-
-// ProviderSet 提供者集合
-var ProviderSet = wire.NewSet(database.Get, services.NewRecipeService, services.NewAuthService, services.NewFavoriteService, services.NewTagService, services.NewRecommendService, handlers.NewRecipeHandler, handlers.NewAuthHandler, handlers.NewFavoriteHandler, handlers.NewHomeHandler, handlers.NewTagHandler, handlers.NewRecommendHandler)
 
 // App 应用依赖容器
 type App struct {

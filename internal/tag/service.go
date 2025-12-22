@@ -1,4 +1,4 @@
-package services
+package tag
 
 import (
 	"choosy-backend/internal/models"
@@ -6,32 +6,32 @@ import (
 	"gorm.io/gorm"
 )
 
-// TagService 标签服务
-type TagService struct {
+// Service 标签服务
+type Service struct {
 	db *gorm.DB
 }
 
-// NewTagService 创建标签服务
-func NewTagService(db *gorm.DB) *TagService {
-	return &TagService{db: db}
+// NewService 创建标签服务
+func NewService(db *gorm.DB) *Service {
+	return &Service{db: db}
 }
 
 // GetTagsByRecipe 获取菜谱的所有标签
-func (s *TagService) GetTagsByRecipe(recipeID string) ([]models.Tag, error) {
+func (s *Service) GetTagsByRecipe(recipeID string) ([]models.Tag, error) {
 	var tags []models.Tag
 	err := s.db.Where("recipe_id = ?", recipeID).Order("type, _id").Find(&tags).Error
 	return tags, err
 }
 
-// GetTagsByType 按类型获取某菜谱的标签
-func (s *TagService) GetTagsByRecipeAndType(recipeID string, tagType models.TagType) ([]models.Tag, error) {
+// GetTagsByRecipeAndType 按类型获取某菜谱的标签
+func (s *Service) GetTagsByRecipeAndType(recipeID string, tagType models.TagType) ([]models.Tag, error) {
 	var tags []models.Tag
 	err := s.db.Where("recipe_id = ? AND type = ?", recipeID, tagType).Find(&tags).Error
 	return tags, err
 }
 
 // AddTag 添加标签
-func (s *TagService) AddTag(recipeID string, value string, label string, tagType models.TagType) error {
+func (s *Service) AddTag(recipeID string, value string, label string, tagType models.TagType) error {
 	tag := models.Tag{
 		RecipeID: recipeID,
 		Value:    value,
@@ -42,17 +42,17 @@ func (s *TagService) AddTag(recipeID string, value string, label string, tagType
 }
 
 // DeleteRecipeTags 删除菜谱的所有标签
-func (s *TagService) DeleteRecipeTags(recipeID string) error {
+func (s *Service) DeleteRecipeTags(recipeID string) error {
 	return s.db.Where("recipe_id = ?", recipeID).Delete(&models.Tag{}).Error
 }
 
 // DeleteRecipeTagsByType 删除菜谱某类型的标签
-func (s *TagService) DeleteRecipeTagsByType(recipeID string, tagType models.TagType) error {
+func (s *Service) DeleteRecipeTagsByType(recipeID string, tagType models.TagType) error {
 	return s.db.Where("recipe_id = ? AND type = ?", recipeID, tagType).Delete(&models.Tag{}).Error
 }
 
 // GetRecipesByTagValue 获取包含某标签的所有菜谱 ID
-func (s *TagService) GetRecipesByTagValue(value string) ([]string, error) {
+func (s *Service) GetRecipesByTagValue(value string) ([]string, error) {
 	var recipeIDs []string
 	err := s.db.Model(&models.Tag{}).
 		Where("value = ?", value).
@@ -62,7 +62,7 @@ func (s *TagService) GetRecipesByTagValue(value string) ([]string, error) {
 }
 
 // GetRecipesByTagType 获取包含某类型标签的所有菜谱 ID
-func (s *TagService) GetRecipesByTagType(tagType models.TagType) ([]string, error) {
+func (s *Service) GetRecipesByTagType(tagType models.TagType) ([]string, error) {
 	var recipeIDs []string
 	err := s.db.Model(&models.Tag{}).
 		Where("type = ?", tagType).
@@ -71,15 +71,15 @@ func (s *TagService) GetRecipesByTagType(tagType models.TagType) ([]string, erro
 	return recipeIDs, err
 }
 
-// GetDistinctTagValues 获取所有去重的标签值
-func (s *TagService) GetDistinctTagValues(tagType models.TagType) ([]struct {
+// TagValue 标签值
+type TagValue struct {
 	Value string
 	Label string
-}, error) {
-	var results []struct {
-		Value string
-		Label string
-	}
+}
+
+// GetDistinctTagValues 获取所有去重的标签值
+func (s *Service) GetDistinctTagValues(tagType models.TagType) ([]TagValue, error) {
+	var results []TagValue
 	err := s.db.Model(&models.Tag{}).
 		Select("DISTINCT value, label").
 		Where("type = ?", tagType).
@@ -87,3 +87,4 @@ func (s *TagService) GetDistinctTagValues(tagType models.TagType) ([]struct {
 		Scan(&results).Error
 	return results, err
 }
+

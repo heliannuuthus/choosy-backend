@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"choosy-backend/internal/models"
-	"choosy-backend/internal/services"
+	"choosy-backend/internal/tag"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -12,23 +12,22 @@ import (
 
 // TagHandler 标签处理器
 type TagHandler struct {
-	service *services.TagService
+	service *tag.Service
 }
 
 // NewTagHandler 创建标签处理器
 func NewTagHandler(db *gorm.DB) *TagHandler {
 	return &TagHandler{
-		service: services.NewTagService(db),
+		service: tag.NewService(db),
 	}
 }
 
-// TagValueResponse 去重后的标签值响应
 type TagValueResponse struct {
 	Value string `json:"value"`
 	Label string `json:"label"`
 }
 
-// GetCuisines 获取所有菜系（去重）
+// GetCuisines 获取所有菜系
 // @Summary 获取所有菜系
 // @Tags tags
 // @Produce json
@@ -48,7 +47,7 @@ func (h *TagHandler) GetCuisines(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// GetFlavors 获取所有口味（去重）
+// GetFlavors 获取所有口味
 // @Summary 获取所有口味
 // @Tags tags
 // @Produce json
@@ -68,7 +67,7 @@ func (h *TagHandler) GetFlavors(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// GetScenes 获取所有场景（去重）
+// GetScenes 获取所有场景
 // @Summary 获取所有场景
 // @Tags tags
 // @Produce json

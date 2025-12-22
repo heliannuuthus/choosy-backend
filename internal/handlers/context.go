@@ -1,55 +1,54 @@
 package handlers
 
 import (
-	"choosy-backend/internal/config"
-	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
+
+	"choosy-backend/internal/amap"
+	"choosy-backend/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
 
 // ContextHandler 上下文处理器
-type ContextHandler struct{}
-
-func NewContextHandler() *ContextHandler {
-	return &ContextHandler{}
+type ContextHandler struct {
+	amap *amap.Client
 }
 
-// ContextRequest 上下文请求
+func NewContextHandler() *ContextHandler {
+	return &ContextHandler{
+		amap: amap.GetClient(),
+	}
+}
+
 type ContextRequest struct {
 	Latitude  float64 `json:"latitude" binding:"required"`
 	Longitude float64 `json:"longitude" binding:"required"`
-	Timestamp int64   `json:"timestamp"` // 可选，默认当前时间
+	Timestamp int64   `json:"timestamp"`
 }
 
-// LocationInfo 位置信息
 type LocationInfo struct {
 	Province string `json:"province"`
 	City     string `json:"city"`
 	District string `json:"district"`
-	Adcode   string `json:"-"` // 内部使用，不返回给前端
+	Adcode   string `json:"-"`
 }
 
-// WeatherInfo 天气信息
 type WeatherInfo struct {
-	Temperature float64 `json:"temperature"` // 温度 (摄氏度)
-	Humidity    int     `json:"humidity"`    // 湿度 (%)
-	Weather     string  `json:"weather"`     // 天气状况描述
-	Icon        string  `json:"icon"`        // 天气图标代码
+	Temperature float64 `json:"temperature"`
+	Humidity    int     `json:"humidity"`
+	Weather     string  `json:"weather"`
+	Icon        string  `json:"icon"`
 }
 
-// TimeInfo 时间信息
 type TimeInfo struct {
-	Timestamp int64  `json:"timestamp"`  // 时间戳 (毫秒)
-	MealTime  string `json:"meal_time"`  // 用餐时段: breakfast/lunch/afternoon/dinner/night
-	Season    string `json:"season"`     // 季节: spring/summer/autumn/winter
-	DayOfWeek int    `json:"day_of_week"` // 星期几 0-6
-	Hour      int    `json:"hour"`       // 小时 0-23
+	Timestamp int64  `json:"timestamp"`
+	MealTime  string `json:"meal_time"`
+	Season    string `json:"season"`
+	DayOfWeek int    `json:"day_of_week"`
+	Hour      int    `json:"hour"`
 }
 
-// ContextResponse 上下文响应
 type ContextResponse struct {
 	Location *LocationInfo `json:"location"`
 	Weather  *WeatherInfo  `json:"weather"`
@@ -74,174 +73,41 @@ func (h *ContextHandler) GetContext(c *gin.Context) {
 		return
 	}
 
-	// 默认时间为当前时间
 	if req.Timestamp == 0 {
 		req.Timestamp = time.Now().UnixMilli()
 	}
 
 	response := ContextResponse{}
 
-	// 1. 获取位置信息（逆地理编码，同时获取 adcode）
-	location, err := h.getLocation(req.Latitude, req.Longitude)
+	location, err := h.amap.GetLocation(req.Latitude, req.Longitude)
 	if err == nil {
-		response.Location = location
+		response.Location = &LocationInfo{
+			Province: location.Province,
+			City:     location.City,
+			District: location.District,
+			Adcode:   location.Adcode,
+		}
 
-		// 2. 用 adcode 获取天气信息（复用逆地理编码结果）
 		if location.Adcode != "" {
-			weather, err := h.getWeatherByAdcode(location.Adcode)
+			weather, err := h.amap.GetWeatherByAdcode(location.Adcode)
 			if err == nil {
-				response.Weather = weather
+				response.Weather = &WeatherInfo{
+					Temperature: weather.Temperature,
+					Humidity:    weather.Humidity,
+					Weather:     weather.Weather,
+				}
 			}
 		}
 	}
 
-	// 3. 解析时间信息
-	response.Time = h.getTimeInfo(req.Timestamp)
+	t := time.UnixMilli(req.Timestamp)
+	response.Time = &TimeInfo{
+		Timestamp: req.Timestamp,
+		MealTime:  utils.GetMealTime(t),
+		Season:    utils.GetSeason(t),
+		DayOfWeek: int(t.Weekday()),
+		Hour:      t.Hour(),
+	}
 
 	c.JSON(http.StatusOK, response)
 }
-
-// getLocation 获取位置信息（高德逆地理编码）
-func (h *ContextHandler) getLocation(lat, lng float64) (*LocationInfo, error) {
-	amapKey := config.GetString("amap.api_key")
-	if amapKey == "" {
-		return nil, fmt.Errorf("未配置 amap.api_key")
-	}
-
-	url := fmt.Sprintf("https://restapi.amap.com/v3/geocode/regeo?location=%.6f,%.6f&key=%s", lng, lat, amapKey)
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var result struct {
-		Status    string `json:"status"`
-		Regeocode struct {
-			AddressComponent struct {
-				Province string `json:"province"`
-				City     any    `json:"city"`
-				District string `json:"district"`
-				Adcode   string `json:"adcode"`
-			} `json:"addressComponent"`
-		} `json:"regeocode"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-
-	if result.Status != "1" {
-		return nil, fmt.Errorf("高德 API 错误")
-	}
-
-	addr := result.Regeocode.AddressComponent
-	city := ""
-	switch v := addr.City.(type) {
-	case string:
-		city = v
-	}
-	if city == "" {
-		city = addr.Province
-	}
-
-	return &LocationInfo{
-		Province: addr.Province,
-		City:     city,
-		District: addr.District,
-		Adcode:   result.Regeocode.AddressComponent.Adcode,
-	}, nil
-}
-
-// getWeatherByAdcode 根据 adcode 获取天气信息（高德天气 API）
-func (h *ContextHandler) getWeatherByAdcode(adcode string) (*WeatherInfo, error) {
-	amapKey := config.GetString("amap.api_key")
-	if amapKey == "" {
-		return nil, fmt.Errorf("未配置 amap.api_key")
-	}
-
-	url := fmt.Sprintf("https://restapi.amap.com/v3/weather/weatherInfo?city=%s&key=%s&extensions=base", adcode, amapKey)
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var result struct {
-		Status string `json:"status"`
-		Lives  []struct {
-			Temperature string `json:"temperature"` // 温度
-			Humidity    string `json:"humidity"`    // 湿度
-			Weather     string `json:"weather"`     // 天气现象
-		} `json:"lives"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-
-	if result.Status != "1" || len(result.Lives) == 0 {
-		return nil, fmt.Errorf("获取天气失败")
-	}
-
-	live := result.Lives[0]
-	var temp float64
-	var humidity int
-	fmt.Sscanf(live.Temperature, "%f", &temp)
-	fmt.Sscanf(live.Humidity, "%d", &humidity)
-
-	return &WeatherInfo{
-		Temperature: temp,
-		Humidity:    humidity,
-		Weather:     live.Weather,
-		Icon:        "", // 高德 API 不返回图标代码
-	}, nil
-}
-
-// getTimeInfo 解析时间信息
-func (h *ContextHandler) getTimeInfo(timestamp int64) *TimeInfo {
-	t := time.UnixMilli(timestamp)
-
-	return &TimeInfo{
-		Timestamp:  timestamp,
-		MealTime:   h.getMealTime(t),
-		Season:     h.getSeason(t),
-		DayOfWeek:  int(t.Weekday()),
-		Hour:       t.Hour(),
-	}
-}
-
-// getMealTime 获取用餐时段
-func (h *ContextHandler) getMealTime(t time.Time) string {
-	hour := t.Hour()
-	switch {
-	case hour >= 5 && hour < 10:
-		return "breakfast"
-	case hour >= 10 && hour < 14:
-		return "lunch"
-	case hour >= 14 && hour < 17:
-		return "afternoon"
-	case hour >= 17 && hour < 21:
-		return "dinner"
-	default:
-		return "night"
-	}
-}
-
-// getSeason 获取季节
-func (h *ContextHandler) getSeason(t time.Time) string {
-	month := t.Month()
-	switch {
-	case month >= 3 && month <= 5:
-		return "spring"
-	case month >= 6 && month <= 8:
-		return "summer"
-	case month >= 9 && month <= 11:
-		return "autumn"
-	default:
-		return "winter"
-	}
-}
-

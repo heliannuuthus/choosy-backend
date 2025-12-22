@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"choosy-backend/internal/models"
-	"choosy-backend/internal/services"
+	"choosy-backend/internal/recipe"
 	"choosy-backend/internal/utils"
 
 	"github.com/gin-gonic/gin"
@@ -14,17 +14,16 @@ import (
 
 // RecipeHandler 菜谱处理器
 type RecipeHandler struct {
-	service *services.RecipeService
+	service *recipe.Service
 }
 
 // NewRecipeHandler 创建菜谱处理器
 func NewRecipeHandler(db *gorm.DB) *RecipeHandler {
 	return &RecipeHandler{
-		service: services.NewRecipeService(db),
+		service: recipe.NewService(db),
 	}
 }
 
-// 分类中文名称映射
 var categoryNames = map[string]string{
 	"aquatic":        "水产",
 	"breakfast":      "早餐",
@@ -37,7 +36,6 @@ var categoryNames = map[string]string{
 	"vegetable_dish": "素菜",
 }
 
-// IngredientRequest 食材请求
 type IngredientRequest struct {
 	Name         string   `json:"name" binding:"required"`
 	Quantity     *float64 `json:"quantity"`
@@ -46,15 +44,13 @@ type IngredientRequest struct {
 	Notes        *string  `json:"notes"`
 }
 
-// StepRequest 步骤请求
 type StepRequest struct {
 	Step        int    `json:"step" binding:"required"`
 	Description string `json:"description" binding:"required"`
 }
 
-// RecipeCreateRequest 创建菜谱请求
 type RecipeCreateRequest struct {
-	ID               string              `json:"id"` // 可选，不提供则自动生成
+	ID               string              `json:"id"`
 	Name             string              `json:"name" binding:"required"`
 	Description      *string             `json:"description"`
 	Images           []string            `json:"images"`
@@ -70,7 +66,6 @@ type RecipeCreateRequest struct {
 	AdditionalNotes  []string            `json:"additional_notes"`
 }
 
-// RecipeUpdateRequest 更新菜谱请求
 type RecipeUpdateRequest struct {
 	Name             *string              `json:"name"`
 	Description      *string              `json:"description"`
@@ -87,32 +82,29 @@ type RecipeUpdateRequest struct {
 	AdditionalNotes  *[]string            `json:"additional_notes"`
 }
 
-// TagsGrouped 分组的标签
 type TagsGrouped struct {
 	Cuisines []string `json:"cuisines"`
 	Flavors  []string `json:"flavors"`
 	Scenes   []string `json:"scenes"`
 }
 
-// RecipeListItem 菜谱列表项
 type RecipeListItem struct {
-	ID               string       `json:"id"`
-	Name             string       `json:"name"`
-	Description      *string      `json:"description"`
-	Category         string       `json:"category"`
-	Difficulty       int          `json:"difficulty"`
-	Tags             TagsGrouped  `json:"tags"`
-	ImagePath        *string      `json:"image_path"`
-	TotalTimeMinutes *int         `json:"total_time_minutes"`
+	ID               string      `json:"id"`
+	Name             string      `json:"name"`
+	Description      *string     `json:"description"`
+	Category         string      `json:"category"`
+	Difficulty       int         `json:"difficulty"`
+	Tags             TagsGrouped `json:"tags"`
+	ImagePath        *string     `json:"image_path"`
+	TotalTimeMinutes *int        `json:"total_time_minutes"`
 }
 
-// RecipeResponse 菜谱响应
 type RecipeResponse struct {
 	ID               string               `json:"id"`
 	Name             string               `json:"name"`
 	Description      *string              `json:"description"`
 	Images           []string             `json:"images"`
-	ImagePath        *string              `json:"image_path"` // images[0]，兼容前端
+	ImagePath        *string              `json:"image_path"`
 	Category         string               `json:"category"`
 	Difficulty       int                  `json:"difficulty"`
 	Tags             TagsGrouped          `json:"tags"`
@@ -125,7 +117,6 @@ type RecipeResponse struct {
 	AdditionalNotes  []string             `json:"additional_notes"`
 }
 
-// IngredientResponse 食材响应
 type IngredientResponse struct {
 	ID           uint     `json:"id"`
 	Name         string   `json:"name"`
@@ -135,14 +126,12 @@ type IngredientResponse struct {
 	Notes        *string  `json:"notes"`
 }
 
-// StepResponse 步骤响应
 type StepResponse struct {
 	ID          uint   `json:"id"`
 	Step        int    `json:"step"`
 	Description string `json:"description"`
 }
 
-// CategoryResponse 分类响应
 type CategoryResponse struct {
 	Key   string `json:"key"`
 	Label string `json:"label"`
@@ -164,14 +153,12 @@ func (h *RecipeHandler) CreateRecipe(c *gin.Context) {
 		return
 	}
 
-	// 自动生成 ID（如果未提供）
 	recipeID := req.ID
 	if recipeID == "" {
 		recipeID = utils.GenerateRecipeID()
 	}
 
-	// 转换为模型 (Tags 通过关联表管理，不在这里设置)
-	recipe := models.Recipe{
+	recipeModel := models.Recipe{
 		RecipeID:         recipeID,
 		Name:             req.Name,
 		Description:      req.Description,
@@ -203,13 +190,12 @@ func (h *RecipeHandler) CreateRecipe(c *gin.Context) {
 		}
 	}
 
-	if err := h.service.CreateRecipe(&recipe, ingredients, steps, req.AdditionalNotes); err != nil {
+	if err := h.service.CreateRecipe(&recipeModel, ingredients, steps, req.AdditionalNotes); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"detail": err.Error()})
 		return
 	}
 
-	// 重新获取完整的菜谱
-	createdRecipe, _ := h.service.GetRecipe(recipe.RecipeID)
+	createdRecipe, _ := h.service.GetRecipe(recipeModel.RecipeID)
 	c.JSON(http.StatusCreated, h.toRecipeResponse(createdRecipe))
 }
 
@@ -245,7 +231,6 @@ func (h *RecipeHandler) GetRecipes(c *gin.Context) {
 		return
 	}
 
-	// 转换为列表项
 	items := make([]RecipeListItem, len(recipes))
 	for i, r := range recipes {
 		items[i] = RecipeListItem{
@@ -274,18 +259,18 @@ func (h *RecipeHandler) GetRecipes(c *gin.Context) {
 func (h *RecipeHandler) GetRecipe(c *gin.Context) {
 	id := c.Param("recipe_id")
 
-	recipe, err := h.service.GetRecipe(id)
+	recipeModel, err := h.service.GetRecipe(id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"detail": err.Error()})
 		return
 	}
 
-	if recipe == nil {
+	if recipeModel == nil {
 		c.JSON(http.StatusNotFound, gin.H{"detail": "菜谱 ID '" + id + "' 不存在"})
 		return
 	}
 
-	c.JSON(http.StatusOK, h.toRecipeResponse(recipe))
+	c.JSON(http.StatusOK, h.toRecipeResponse(recipeModel))
 }
 
 // UpdateRecipe 更新菜谱
@@ -307,7 +292,6 @@ func (h *RecipeHandler) UpdateRecipe(c *gin.Context) {
 		return
 	}
 
-	// 构建更新字段
 	updates := make(map[string]interface{})
 	if req.Name != nil {
 		updates["name"] = *req.Name
@@ -324,7 +308,6 @@ func (h *RecipeHandler) UpdateRecipe(c *gin.Context) {
 	if req.Difficulty != nil {
 		updates["difficulty"] = *req.Difficulty
 	}
-	// Tags 通过关联表管理，暂不支持通过 API 更新
 	if req.Servings != nil {
 		updates["servings"] = *req.Servings
 	}
@@ -338,7 +321,6 @@ func (h *RecipeHandler) UpdateRecipe(c *gin.Context) {
 		updates["total_time_minutes"] = *req.TotalTimeMinutes
 	}
 
-	// 转换食材
 	var ingredients []models.Ingredient
 	if req.Ingredients != nil {
 		ingredients = make([]models.Ingredient, len(*req.Ingredients))
@@ -353,7 +335,6 @@ func (h *RecipeHandler) UpdateRecipe(c *gin.Context) {
 		}
 	}
 
-	// 转换步骤
 	var steps []models.Step
 	if req.Steps != nil {
 		steps = make([]models.Step, len(*req.Steps))
@@ -365,13 +346,12 @@ func (h *RecipeHandler) UpdateRecipe(c *gin.Context) {
 		}
 	}
 
-	// 小贴士
 	var notes []string
 	if req.AdditionalNotes != nil {
 		notes = *req.AdditionalNotes
 	}
 
-	recipe, err := h.service.UpdateRecipe(
+	recipeModel, err := h.service.UpdateRecipe(
 		id,
 		updates,
 		ingredients,
@@ -386,13 +366,12 @@ func (h *RecipeHandler) UpdateRecipe(c *gin.Context) {
 		return
 	}
 
-	// 重新获取完整的菜谱
 	updatedRecipe, _ := h.service.GetRecipe(id)
 	if updatedRecipe != nil {
-		recipe = updatedRecipe
+		recipeModel = updatedRecipe
 	}
 
-	c.JSON(http.StatusOK, h.toRecipeResponse(recipe))
+	c.JSON(http.StatusOK, h.toRecipeResponse(recipeModel))
 }
 
 // DeleteRecipe 删除菜谱
@@ -509,12 +488,11 @@ func (h *RecipeHandler) CreateRecipesBatch(c *gin.Context) {
 		return
 	}
 
-	// 转换响应
 	responses := make([]RecipeResponse, len(created))
 	for i, r := range created {
-		recipe, _ := h.service.GetRecipe(r.RecipeID)
-		if recipe != nil {
-			responses[i] = *h.toRecipeResponse(recipe)
+		recipeModel, _ := h.service.GetRecipe(r.RecipeID)
+		if recipeModel != nil {
+			responses[i] = *h.toRecipeResponse(recipeModel)
 		}
 	}
 
@@ -541,7 +519,6 @@ func GroupTags(tags []models.Tag) TagsGrouped {
 	return result
 }
 
-// toRecipeResponse 转换为响应格式
 func (h *RecipeHandler) toRecipeResponse(r *models.Recipe) *RecipeResponse {
 	if r == nil {
 		return nil

@@ -1,4 +1,4 @@
-package services
+package auth
 
 import (
 	"crypto/aes"
@@ -21,60 +21,19 @@ import (
 	"gorm.io/gorm"
 )
 
-// JWK 密钥结构
-type JWK struct {
-	Kty string `json:"kty"`
-	Crv string `json:"crv,omitempty"`
-	Kid string `json:"kid"`
-	Use string `json:"use"`
-	Alg string `json:"alg"`
-	X   string `json:"x,omitempty"` // Ed25519 公钥
-	D   string `json:"d,omitempty"` // Ed25519 私钥
-	K   string `json:"k,omitempty"` // 对称密钥
-}
-
-// UserIdentity 用户身份信息（JWE 内层加密内容）
-type UserIdentity struct {
-	OpenID   string `json:"sub"`               // 系统生成的 openid
-	TOpenID  string `json:"uid"`               // 第三方平台 openid
-	Nickname string `json:"nickname,omitempty"` // 昵称
-	Avatar   string `json:"picture,omitempty"`  // 头像
-}
-
-// GetOpenID 返回系统生成的 openid
-func (u *UserIdentity) GetOpenID() string {
-	return u.OpenID
-}
-
-// GetTOpenID 返回第三方平台 openid
-func (u *UserIdentity) GetTOpenID() string {
-	return u.TOpenID
-}
-
-// TokenPair token 对
-type TokenPair struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	TokenType    string `json:"token_type"`
-	ExpiresIn    int    `json:"expires_in"`
-}
-
 var (
 	jwsKey *JWK
 	jweKey *JWK
 )
 
-// Base64URL 编码（无 padding）
 func b64URLEncode(data []byte) string {
 	return base64.RawURLEncoding.EncodeToString(data)
 }
 
-// Base64URL 解码
 func b64URLDecode(s string) ([]byte, error) {
 	return base64.RawURLEncoding.DecodeString(s)
 }
 
-// 解码 JWK
 func decodeJWK(encoded string) (*JWK, error) {
 	jsonBytes, err := b64URLDecode(encoded)
 	if err != nil {
@@ -119,15 +78,13 @@ func GetJWEKey() (*JWK, error) {
 	return jweKey, err
 }
 
-// 生成 32 字符 hex ID
 func generateID() string {
 	bytes := make([]byte, 16)
 	rand.Read(bytes)
 	return hex.EncodeToString(bytes)
 }
 
-// encryptIdentity AES-GCM 加密用户身份（JWE 内层）
-func encryptIdentity(identity *UserIdentity) (string, error) {
+func encryptIdentity(identity *Identity) (string, error) {
 	plaintext, err := json.Marshal(identity)
 	if err != nil {
 		return "", err
@@ -164,8 +121,7 @@ func encryptIdentity(identity *UserIdentity) (string, error) {
 	return b64URLEncode(result), nil
 }
 
-// decryptIdentity AES-GCM 解密用户身份
-func decryptIdentity(encrypted string) (*UserIdentity, error) {
+func decryptIdentity(encrypted string) (*Identity, error) {
 	data, err := b64URLDecode(encrypted)
 	if err != nil {
 		return nil, err
@@ -203,7 +159,7 @@ func decryptIdentity(encrypted string) (*UserIdentity, error) {
 		return nil, err
 	}
 
-	var identity UserIdentity
+	var identity Identity
 	if err := json.Unmarshal(plaintext, &identity); err != nil {
 		return nil, err
 	}
@@ -211,7 +167,6 @@ func decryptIdentity(encrypted string) (*UserIdentity, error) {
 	return &identity, nil
 }
 
-// 获取 Ed25519 私钥
 func getSigningKey() (ed25519.PrivateKey, error) {
 	jwsK, err := GetJWSKey()
 	if err != nil {
@@ -235,7 +190,6 @@ func getSigningKey() (ed25519.PrivateKey, error) {
 	return ed25519.PrivateKey(privateKey), nil
 }
 
-// 获取 Ed25519 公钥
 func getVerifyKey() (ed25519.PublicKey, error) {
 	jwsK, err := GetJWSKey()
 	if err != nil {
@@ -250,11 +204,9 @@ func getVerifyKey() (ed25519.PublicKey, error) {
 	return ed25519.PublicKey(publicBytes), nil
 }
 
-// 创建 access_token（外层 JWS，内层 JWE 加密用户信息）
-func createAccessToken(identity *UserIdentity) (string, error) {
+func createAccessToken(identity *Identity) (string, error) {
 	now := time.Now()
 
-	// 加密用户身份信息（JWE 内层）
 	encryptedSub, err := encryptIdentity(identity)
 	if err != nil {
 		return "", fmt.Errorf("加密身份信息失败: %w", err)
@@ -275,11 +227,10 @@ func createAccessToken(identity *UserIdentity) (string, error) {
 
 	expiresIn := config.GetInt("auth.expiresIn")
 
-	// 外层 JWS claims
 	claims := jwt.MapClaims{
 		"iss": config.GetString("auth.issuer"),
 		"aud": config.GetString("auth.audience"),
-		"sub": encryptedSub, // 加密的用户身份信息
+		"sub": encryptedSub,
 		"iat": now.Unix(),
 		"exp": now.Add(time.Duration(expiresIn) * time.Second).Unix(),
 		"jti": b64URLEncode(jti),
@@ -291,10 +242,8 @@ func createAccessToken(identity *UserIdentity) (string, error) {
 	return token.SignedString(privateKey)
 }
 
-// Base62 字符集
 const base62Chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-// Base62 编码
 func base62Encode(data []byte) string {
 	num := new(big.Int).SetBytes(data)
 	if num.Sign() == 0 {
@@ -313,14 +262,12 @@ func base62Encode(data []byte) string {
 	return string(result)
 }
 
-// 生成 refresh_token
 func generateRefreshToken() string {
 	randomBytes := make([]byte, 24)
 	rand.Read(randomBytes)
 	return base62Encode(randomBytes)
 }
 
-// 清理旧的 refresh_token
 func cleanupOldRefreshTokens(db *gorm.DB, openid string) {
 	maxTokens := config.GetInt("auth.maxRefreshToken")
 
@@ -336,39 +283,32 @@ func cleanupOldRefreshTokens(db *gorm.DB, openid string) {
 }
 
 // GenerateTokenPair 生成 access_token 和 refresh_token
-// tOpenID: 第三方平台原始 openid（如微信 openid）
 func GenerateTokenPair(db *gorm.DB, tOpenID, nickname, avatar string) (*TokenPair, error) {
 	now := time.Now()
 
-	// upsert 用户信息
 	user, err := upsertUser(db, tOpenID, nickname, avatar)
 	if err != nil {
 		return nil, fmt.Errorf("保存用户信息失败: %w", err)
 	}
 
-	// 构建用户身份信息（JWE 内层）
-	identity := &UserIdentity{
-		OpenID:   user.OpenID,   // 系统生成的 openid
-		TOpenID:  user.TOpenID,  // 第三方平台 openid
+	identity := &Identity{
+		OpenID:   user.OpenID,
+		TOpenID:  user.TOpenID,
 		Nickname: user.Nickname,
 		Avatar:   user.Avatar,
 	}
 
-	// 生成 access_token（外层 JWS + 内层 JWE）
 	accessToken, err := createAccessToken(identity)
 	if err != nil {
 		return nil, fmt.Errorf("生成 access_token 失败: %w", err)
 	}
 
-	// 生成 refresh_token
 	refreshToken := generateRefreshToken()
 	refreshExpiresIn := config.GetInt("auth.refreshExpiresIn")
 	expiresAt := now.Add(time.Duration(refreshExpiresIn) * 24 * time.Hour)
 
-	// 清理旧的 refresh_token（用 openid 关联）
 	cleanupOldRefreshTokens(db, user.OpenID)
 
-	// 存储 refresh_token（ID 自增，无需手动设置）
 	dbToken := models.RefreshToken{
 		OpenID:    user.OpenID,
 		Token:     refreshToken,
@@ -389,13 +329,11 @@ func GenerateTokenPair(db *gorm.DB, tOpenID, nickname, avatar string) (*TokenPai
 	}, nil
 }
 
-// upsertUser 创建或更新用户（首次登录创建，后续登录不更新 nickname/avatar）
 func upsertUser(db *gorm.DB, tOpenID, nickname, avatar string) (*models.User, error) {
 	var user models.User
 	err := db.Where("t_openid = ?", tOpenID).First(&user).Error
 
 	if err == nil {
-		// 用户已存在，直接返回（不更新 nickname/avatar，让用户自己改）
 		return &user, nil
 	}
 
@@ -403,10 +341,9 @@ func upsertUser(db *gorm.DB, tOpenID, nickname, avatar string) (*models.User, er
 		return nil, err
 	}
 
-	// 新用户，创建记录（ID 自增，OpenID 作为对外标识）
 	now := time.Now()
 	user = models.User{
-		OpenID:    generateID(), // 系统生成的唯一标识，对外 ID
+		OpenID:    generateID(),
 		TOpenID:   tOpenID,
 		Nickname:  nickname,
 		Avatar:    avatar,
@@ -422,7 +359,7 @@ func upsertUser(db *gorm.DB, tOpenID, nickname, avatar string) (*models.User, er
 }
 
 // VerifyAccessToken 验证 access_token 并解密身份信息
-func VerifyAccessToken(tokenString string) (*UserIdentity, error) {
+func VerifyAccessToken(tokenString string) (*Identity, error) {
 	publicKey, err := getVerifyKey()
 	if err != nil {
 		return nil, err
@@ -444,7 +381,6 @@ func VerifyAccessToken(tokenString string) (*UserIdentity, error) {
 		return nil, errors.New("无效的 token")
 	}
 
-	// 获取加密的 sub 并解密
 	encryptedSub, ok := claims["sub"].(string)
 	if !ok {
 		return nil, errors.New("缺少 sub 声明")
@@ -470,7 +406,6 @@ func RefreshTokens(db *gorm.DB, refreshToken string) (*TokenPair, error) {
 		return nil, errors.New("refresh_token 已过期")
 	}
 
-	// 通过 openid 查用户（获取最新信息）
 	var user models.User
 	if err := db.Where("openid = ?", dbToken.OpenID).First(&user).Error; err != nil {
 		return nil, errors.New("用户不存在")
@@ -478,7 +413,6 @@ func RefreshTokens(db *gorm.DB, refreshToken string) (*TokenPair, error) {
 
 	db.Delete(&dbToken)
 
-	// 重新生成 token（使用数据库中最新的 nickname/avatar）
 	return GenerateTokenPair(db, user.TOpenID, user.Nickname, user.Avatar)
 }
 
@@ -502,3 +436,4 @@ func GetOpenIDFromToken(tokenString string) (string, error) {
 	}
 	return identity.GetOpenID(), nil
 }
+
