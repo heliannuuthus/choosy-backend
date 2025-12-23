@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"choosy-backend/internal/services"
+	"choosy-backend/internal/auth"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,13 +18,12 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// 移除 Bearer 前缀
 		token := authorization
 		if strings.HasPrefix(authorization, "Bearer ") {
 			token = authorization[7:]
 		}
 
-		identity, err := services.VerifyAccessToken(token)
+		identity, err := auth.VerifyAccessToken(token)
 		if err == nil && identity != nil {
 			c.Set("user", identity)
 		}
@@ -42,13 +41,12 @@ func RequireAuth() gin.HandlerFunc {
 			return
 		}
 
-		// 移除 Bearer 前缀
 		token := authorization
 		if strings.HasPrefix(authorization, "Bearer ") {
 			token = authorization[7:]
 		}
 
-		identity, err := services.VerifyAccessToken(token)
+		identity, err := auth.VerifyAccessToken(token)
 		if err != nil || identity == nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"detail": "未登录或登录已过期"})
 			return
@@ -58,4 +56,3 @@ func RequireAuth() gin.HandlerFunc {
 		c.Next()
 	}
 }
-

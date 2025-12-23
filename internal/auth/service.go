@@ -1,4 +1,4 @@
-package services
+package auth
 
 import (
 	"encoding/json"
@@ -12,27 +12,18 @@ import (
 	"gorm.io/gorm"
 )
 
-// AuthService 认证服务
-type AuthService struct {
+// Service 认证服务
+type Service struct {
 	db *gorm.DB
 }
 
-// NewAuthService 创建认证服务
-func NewAuthService(db *gorm.DB) *AuthService {
-	return &AuthService{db: db}
-}
-
-// WxCode2SessionResponse 微信 code2session 响应
-type WxCode2SessionResponse struct {
-	OpenID     string `json:"openid"`
-	SessionKey string `json:"session_key"`
-	UnionID    string `json:"unionid,omitempty"`
-	ErrCode    int    `json:"errcode,omitempty"`
-	ErrMsg     string `json:"errmsg,omitempty"`
+// NewService 创建认证服务
+func NewService(db *gorm.DB) *Service {
+	return &Service{db: db}
 }
 
 // WxCode2Session 调用微信 code2session 接口
-func (s *AuthService) WxCode2Session(code string) (*WxCode2SessionResponse, error) {
+func (s *Service) WxCode2Session(code string) (*WxCode2SessionResponse, error) {
 	appid := config.GetString("idps.wxmp.appid")
 	secret := config.GetString("idps.wxmp.secret")
 	if appid == "" || secret == "" {
@@ -66,37 +57,36 @@ func (s *AuthService) WxCode2Session(code string) (*WxCode2SessionResponse, erro
 }
 
 // GenerateToken 生成 token
-func (s *AuthService) GenerateToken(openid, nickname, avatar string) (*TokenPair, error) {
+func (s *Service) GenerateToken(openid, nickname, avatar string) (*TokenPair, error) {
 	return GenerateTokenPair(s.db, openid, nickname, avatar)
 }
 
 // VerifyToken 验证 access_token
-func (s *AuthService) VerifyToken(token string) (*UserIdentity, error) {
+func (s *Service) VerifyToken(token string) (*Identity, error) {
 	return VerifyAccessToken(token)
 }
 
 // RefreshToken 刷新 token
-func (s *AuthService) RefreshToken(refreshToken string) (*TokenPair, error) {
+func (s *Service) RefreshToken(refreshToken string) (*TokenPair, error) {
 	return RefreshTokens(s.db, refreshToken)
 }
 
 // RevokeToken 撤销 refresh_token
-func (s *AuthService) RevokeToken(refreshToken string) bool {
+func (s *Service) RevokeToken(refreshToken string) bool {
 	return RevokeRefreshToken(s.db, refreshToken)
 }
 
 // RevokeAllTokens 撤销用户所有 refresh_token
-func (s *AuthService) RevokeAllTokens(openid string) int64 {
+func (s *Service) RevokeAllTokens(openid string) int64 {
 	return RevokeAllRefreshTokens(s.db, openid)
 }
 
 // GetCurrentUser 从 Authorization header 获取当前用户
-func GetCurrentUser(authorization string) (*UserIdentity, error) {
+func GetCurrentUser(authorization string) (*Identity, error) {
 	if authorization == "" {
 		return nil, errors.New("未提供认证信息")
 	}
 
-	// 移除 Bearer 前缀
 	token := authorization
 	if len(authorization) > 7 && authorization[:7] == "Bearer " {
 		token = authorization[7:]

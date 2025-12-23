@@ -6,16 +6,15 @@ import (
 	"net/http"
 	"net/url"
 
+	"choosy-backend/internal/auth"
 	"choosy-backend/internal/config"
 	"choosy-backend/internal/logger"
 	"choosy-backend/internal/models"
-	"choosy-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-// 随机昵称词库
 var (
 	adjectives = []string{
 		"快乐的", "开心的", "可爱的", "勤劳的", "聪明的", "活泼的", "温柔的", "勇敢的",
@@ -27,49 +26,43 @@ var (
 	}
 )
 
-// generateRandomNickname 生成随机昵称
 func generateRandomNickname() string {
 	adj := adjectives[rand.Intn(len(adjectives))]
 	noun := nouns[rand.Intn(len(nouns))]
 	return adj + noun
 }
 
-// generateRandomAvatar 生成随机头像 URL（使用 DiceBear API）
 func generateRandomAvatar(seed string) string {
-	// 使用 openid 作为 seed 保证同一用户头像一致
 	return fmt.Sprintf("https://api.dicebear.com/7.x/fun-emoji/svg?seed=%s", url.QueryEscape(seed))
 }
 
 // AuthHandler 认证处理器
 type AuthHandler struct {
 	db      *gorm.DB
-	service *services.AuthService
+	service *auth.Service
 }
 
 // NewAuthHandler 创建认证处理器
 func NewAuthHandler(db *gorm.DB) *AuthHandler {
 	return &AuthHandler{
 		db:      db,
-		service: services.NewAuthService(db),
+		service: auth.NewService(db),
 	}
 }
 
-// OAuth2 grant types
 const (
 	GrantTypeAuthorizationCode = "authorization_code"
 	GrantTypeRefreshToken      = "refresh_token"
 )
 
-// TokenRequest OAuth2.1 风格的 token 请求（form-urlencoded）
 type TokenRequest struct {
 	GrantType    string `form:"grant_type" binding:"required,oneof=authorization_code refresh_token"`
-	Code         string `form:"code"`          // grant_type=authorization_code 时必填
-	RefreshToken string `form:"refresh_token"` // grant_type=refresh_token 时必填
-	Nickname     string `form:"nickname"`      // 可选，用户昵称
-	Avatar       string `form:"avatar"`        // 可选，用户头像 URL
+	Code         string `form:"code"`
+	RefreshToken string `form:"refresh_token"`
+	Nickname     string `form:"nickname"`
+	Avatar       string `form:"avatar"`
 }
 
-// TokenResponse token 响应
 type TokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
@@ -77,7 +70,6 @@ type TokenResponse struct {
 	ExpiresIn    int    `json:"expires_in"`
 }
 
-// OAuth2Error OAuth2 错误响应
 type OAuth2Error struct {
 	Error            string `json:"error"`
 	ErrorDescription string `json:"error_description,omitempty"`
@@ -94,7 +86,7 @@ type OAuth2Error struct {
 // @Param refresh_token formData string false "刷新令牌（grant_type=refresh_token 时必填）"
 // @Success 200 {object} TokenResponse
 // @Failure 400 {object} OAuth2Error
-// @Failure 401 {object} OAuth2Error
+// @Failure 412 {object} OAuth2Error "refresh_token 无效或已过期"
 // @Failure 500 {object} OAuth2Error
 // @Router /api/auth/token [post]
 func (h *AuthHandler) Token(c *gin.Context) {
@@ -120,7 +112,6 @@ func (h *AuthHandler) Token(c *gin.Context) {
 	}
 }
 
-// handleAuthorizationCode 处理微信登录
 func (h *AuthHandler) handleAuthorizationCode(c *gin.Context, code, nickname, avatar string) {
 	if code == "" {
 		c.JSON(http.StatusBadRequest, OAuth2Error{
@@ -141,7 +132,6 @@ func (h *AuthHandler) handleAuthorizationCode(c *gin.Context, code, nickname, av
 		return
 	}
 
-	// 调用微信接口
 	wxResult, err := h.service.WxCode2Session(code)
 	if err != nil {
 		logger.Errorf("微信登录失败: %v", err)
@@ -152,7 +142,6 @@ func (h *AuthHandler) handleAuthorizationCode(c *gin.Context, code, nickname, av
 		return
 	}
 
-	// 静默登录时生成随机头像和昵称
 	if nickname == "" {
 		nickname = generateRandomNickname()
 	}
@@ -160,7 +149,6 @@ func (h *AuthHandler) handleAuthorizationCode(c *gin.Context, code, nickname, av
 		avatar = generateRandomAvatar(wxResult.OpenID)
 	}
 
-	// 生成 token（包含用户信息）
 	tokens, err := h.service.GenerateToken(wxResult.OpenID, nickname, avatar)
 	if err != nil {
 		logger.Errorf("生成 token 失败: %v", err)
@@ -179,7 +167,6 @@ func (h *AuthHandler) handleAuthorizationCode(c *gin.Context, code, nickname, av
 	})
 }
 
-// handleRefreshToken 处理 token 刷新
 func (h *AuthHandler) handleRefreshToken(c *gin.Context, refreshToken string) {
 	if refreshToken == "" {
 		c.JSON(http.StatusBadRequest, OAuth2Error{
@@ -206,12 +193,11 @@ func (h *AuthHandler) handleRefreshToken(c *gin.Context, refreshToken string) {
 	})
 }
 
-// RevokeRequest token 撤销请求（form-urlencoded）
 type RevokeRequest struct {
 	Token string `form:"token" binding:"required"`
 }
 
-// Revoke 撤销 token（OAuth2 revocation endpoint）
+// Revoke 撤销 token
 // @Summary 撤销 token
 // @Tags auth
 // @Accept x-www-form-urlencoded
@@ -231,15 +217,13 @@ func (h *AuthHandler) Revoke(c *gin.Context) {
 	}
 
 	h.service.RevokeToken(req.Token)
-	// OAuth2 revocation 规范：无论成功与否都返回 200
 	c.JSON(http.StatusOK, gin.H{"message": "已撤销"})
 }
 
-// UserProfile 用户信息响应
 type UserProfile struct {
-	OpenID   string `json:"openid"`             // 系统生成的唯一标识（对外 ID）
-	Nickname string `json:"nickname,omitempty"` // 昵称
-	Avatar   string `json:"avatar,omitempty"`   // 头像
+	OpenID   string `json:"openid"`
+	Nickname string `json:"nickname,omitempty"`
+	Avatar   string `json:"avatar,omitempty"`
 }
 
 // Profile 获取当前用户信息
@@ -258,9 +242,8 @@ func (h *AuthHandler) Profile(c *gin.Context) {
 		return
 	}
 
-	identity := user.(*services.UserIdentity)
+	identity := user.(*auth.Identity)
 
-	// 从数据库查询最新用户信息
 	var dbUser models.User
 	if err := h.db.Where("openid = ?", identity.GetOpenID()).First(&dbUser).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"detail": "用户不存在"})
@@ -274,7 +257,6 @@ func (h *AuthHandler) Profile(c *gin.Context) {
 	})
 }
 
-// UpdateProfileRequest 更新用户信息请求
 type UpdateProfileRequest struct {
 	Nickname string `json:"nickname" binding:"omitempty,max=64"`
 	Avatar   string `json:"avatar" binding:"omitempty,url,max=512"`
@@ -299,7 +281,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	identity := user.(*services.UserIdentity)
+	identity := user.(*auth.Identity)
 
 	var req UpdateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -307,14 +289,12 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	// 查找用户
 	var dbUser models.User
 	if err := h.db.Where("openid = ?", identity.GetOpenID()).First(&dbUser).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"detail": "用户不存在"})
 		return
 	}
 
-	// 更新非空字段
 	updates := make(map[string]interface{})
 	if req.Nickname != "" {
 		updates["nickname"] = req.Nickname
@@ -330,7 +310,6 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		}
 	}
 
-	// 重新查询返回最新数据
 	h.db.First(&dbUser, "openid = ?", identity.GetOpenID())
 
 	c.JSON(http.StatusOK, UserProfile{
@@ -349,14 +328,13 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 // @Failure 401 {object} map[string]string
 // @Router /api/auth/logout-all [post]
 func (h *AuthHandler) LogoutAll(c *gin.Context) {
-	// 从上下文获取用户信息
 	user, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"detail": "未登录或登录已过期"})
 		return
 	}
 
-	identity := user.(*services.UserIdentity)
+	identity := user.(*auth.Identity)
 	count := h.service.RevokeAllTokens(identity.GetOpenID())
 
 	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("已登出所有设备，共撤销 %d 个会话", count)})

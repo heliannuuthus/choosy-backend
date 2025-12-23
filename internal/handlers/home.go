@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"choosy-backend/internal/config"
-	"choosy-backend/internal/services"
+	"choosy-backend/internal/recipe"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -15,23 +15,22 @@ import (
 
 // HomeHandler 首页处理器
 type HomeHandler struct {
-	recipeService *services.RecipeService
+	recipeService *recipe.Service
 }
 
 // NewHomeHandler 创建首页处理器
 func NewHomeHandler(db *gorm.DB) *HomeHandler {
 	return &HomeHandler{
-		recipeService: services.NewRecipeService(db),
+		recipeService: recipe.NewService(db),
 	}
 }
 
-// BannerItem 海报项
 type BannerItem struct {
 	ID       string `json:"id"`
 	ImageURL string `json:"image_url"`
 	Title    string `json:"title,omitempty"`
 	Link     string `json:"link,omitempty"`
-	LinkType string `json:"link_type,omitempty"` // recipe, url, none
+	LinkType string `json:"link_type,omitempty"`
 }
 
 // GetBanners 获取首页 Banner
@@ -83,17 +82,14 @@ func (h *HomeHandler) GetHotRecipes(c *gin.Context) {
 	c.JSON(http.StatusOK, recipes)
 }
 
-// loadBannersFromConfig 从配置文件加载 banners
 func (h *HomeHandler) loadBannersFromConfig() []BannerItem {
 	var banners []BannerItem
 
-	// 读取配置中的 banners 数组
 	bannersConfig := config.Get("home.banners")
 	if bannersConfig == nil {
 		return banners
 	}
 
-	// 尝试转换为 []interface{}
 	bannersList, ok := bannersConfig.([]interface{})
 	if !ok {
 		return banners
@@ -128,7 +124,6 @@ func (h *HomeHandler) loadBannersFromConfig() []BannerItem {
 	return banners
 }
 
-// getString 从 map 中获取字符串
 func getString(m map[string]interface{}, key, defaultVal string) string {
 	if val, ok := m[key]; ok {
 		if str, ok := val.(string); ok {
@@ -138,12 +133,10 @@ func getString(m map[string]interface{}, key, defaultVal string) string {
 	return defaultVal
 }
 
-// generateBannerID 生成 banner ID
 func generateBannerID(index int) string {
 	return "banner_" + string(rune('a'+index))
 }
 
-// getHotRecipes 获取热门菜谱（按收藏数排序）
 func (h *HomeHandler) getHotRecipes(count int) []RecipeListItem {
 	recipes, _ := h.recipeService.GetHotRecipes(count, nil)
 	if len(recipes) == 0 {
@@ -167,14 +160,12 @@ func (h *HomeHandler) getHotRecipes(count int) []RecipeListItem {
 	return items
 }
 
-// getRandomRecipes 获取随机菜谱
 func (h *HomeHandler) getRandomRecipes(count int) []RecipeListItem {
 	recipes, _ := h.recipeService.GetRecipes("", "", 100, 0)
 	if len(recipes) == 0 {
 		return []RecipeListItem{}
 	}
 
-	// 转换为 RecipeListItem
 	var items []RecipeListItem
 	for _, r := range recipes {
 		items = append(items, RecipeListItem{
@@ -189,13 +180,11 @@ func (h *HomeHandler) getRandomRecipes(count int) []RecipeListItem {
 		})
 	}
 
-	// 随机打乱
 	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(items), func(i, j int) {
 		items[i], items[j] = items[j], items[i]
 	})
 
-	// 取前 count 个
 	if len(items) > count {
 		items = items[:count]
 	}

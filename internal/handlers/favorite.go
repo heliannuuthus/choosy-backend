@@ -4,7 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"choosy-backend/internal/services"
+	"choosy-backend/internal/auth"
+	"choosy-backend/internal/favorite"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -12,51 +13,44 @@ import (
 
 // FavoriteHandler 收藏处理器
 type FavoriteHandler struct {
-	service *services.FavoriteService
+	service *favorite.Service
 }
 
 // NewFavoriteHandler 创建收藏处理器
 func NewFavoriteHandler(db *gorm.DB) *FavoriteHandler {
 	return &FavoriteHandler{
-		service: services.NewFavoriteService(db),
+		service: favorite.NewService(db),
 	}
 }
 
-// FavoriteRequest 收藏请求
 type FavoriteRequest struct {
 	RecipeID string `json:"recipe_id" binding:"required"`
 }
 
-// FavoriteResponse 收藏响应
 type FavoriteResponse struct {
 	RecipeID  string `json:"recipe_id"`
 	CreatedAt string `json:"created_at"`
 }
 
-// FavoriteListItem 收藏列表项
 type FavoriteListItem struct {
 	RecipeID  string          `json:"recipe_id"`
 	CreatedAt string          `json:"created_at"`
 	Recipe    *RecipeListItem `json:"recipe,omitempty"`
 }
 
-// FavoriteListResponse 收藏列表响应
 type FavoriteListResponse struct {
 	Items []FavoriteListItem `json:"items"`
 	Total int64              `json:"total"`
 }
 
-// CheckFavoriteResponse 检查收藏状态响应
 type CheckFavoriteResponse struct {
 	IsFavorite bool `json:"is_favorite"`
 }
 
-// BatchCheckRequest 批量检查请求
 type BatchCheckRequest struct {
 	RecipeIDs []string `json:"recipe_ids" binding:"required"`
 }
 
-// BatchCheckResponse 批量检查响应
 type BatchCheckResponse struct {
 	FavoritedIDs []string `json:"favorited_ids"`
 }
@@ -78,7 +72,7 @@ func (h *FavoriteHandler) AddFavorite(c *gin.Context) {
 		return
 	}
 
-	identity := user.(*services.UserIdentity)
+	identity := user.(*auth.Identity)
 	openID := identity.GetOpenID()
 
 	var req FavoriteRequest
@@ -87,15 +81,15 @@ func (h *FavoriteHandler) AddFavorite(c *gin.Context) {
 		return
 	}
 
-	favorite, err := h.service.AddFavorite(openID, req.RecipeID)
+	fav, err := h.service.AddFavorite(openID, req.RecipeID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"detail": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusCreated, FavoriteResponse{
-		RecipeID:  favorite.RecipeID,
-		CreatedAt: favorite.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		RecipeID:  fav.RecipeID,
+		CreatedAt: fav.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	})
 }
 
@@ -113,7 +107,7 @@ func (h *FavoriteHandler) RemoveFavorite(c *gin.Context) {
 		return
 	}
 
-	identity := user.(*services.UserIdentity)
+	identity := user.(*auth.Identity)
 	openID := identity.GetOpenID()
 	recipeID := c.Param("recipe_id")
 
@@ -140,7 +134,7 @@ func (h *FavoriteHandler) CheckFavorite(c *gin.Context) {
 		return
 	}
 
-	identity := user.(*services.UserIdentity)
+	identity := user.(*auth.Identity)
 	openID := identity.GetOpenID()
 	recipeID := c.Param("recipe_id")
 
@@ -160,7 +154,7 @@ func (h *FavoriteHandler) CheckFavorite(c *gin.Context) {
 // @Tags favorites
 // @Produce json
 // @Param category query string false "分类筛选"
-// @Param search query string false "搜索关键词（菜谱名称或描述）"
+// @Param search query string false "搜索关键词"
 // @Param limit query int false "限制数量" default(20)
 // @Param offset query int false "偏移量" default(0)
 // @Success 200 {object} FavoriteListResponse
@@ -173,7 +167,7 @@ func (h *FavoriteHandler) GetFavorites(c *gin.Context) {
 		return
 	}
 
-	identity := user.(*services.UserIdentity)
+	identity := user.(*auth.Identity)
 	openID := identity.GetOpenID()
 
 	category := c.Query("category")
@@ -242,7 +236,7 @@ func (h *FavoriteHandler) BatchCheckFavorites(c *gin.Context) {
 		return
 	}
 
-	identity := user.(*services.UserIdentity)
+	identity := user.(*auth.Identity)
 	openID := identity.GetOpenID()
 
 	var req BatchCheckRequest
