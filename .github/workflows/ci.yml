@@ -20,24 +20,6 @@ jobs:
       - name: Tidy dependencies
         run: go mod tidy
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-
-  check-generate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Tidy and verify dependencies
-        run: go mod tidy
-
       - name: Install tools
         run: |
           go install github.com/google/wire/cmd/wire@latest
@@ -49,7 +31,7 @@ jobs:
       - name: Generate swagger
         run: swag init --parseDependency --parseInternal
 
-      - name: Check for changes
+      - name: Check generated code
         run: |
           if [ -n "$(git status --porcelain docs/ wire_gen.go)" ]; then
             echo "::error::Generated code is out of date. Run 'make generate' and commit."
@@ -57,8 +39,14 @@ jobs:
             exit 1
           fi
 
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
   test:
     runs-on: ubuntu-latest
+    needs: [lint]
     steps:
       - uses: actions/checkout@v4
 
@@ -83,7 +71,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: [lint, check-generate, test]
+    needs: [test]
     steps:
       - uses: actions/checkout@v4
 
@@ -104,4 +92,3 @@ jobs:
           name: choosy-backend
           path: choosy-backend
           retention-days: 7
-
