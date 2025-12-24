@@ -32,10 +32,8 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Download and verify dependencies
-        run: |
-          go mod download
-          go build ./...
+      - name: Tidy and verify dependencies
+        run: go mod tidy
 
       - name: Install tools
         run: |
