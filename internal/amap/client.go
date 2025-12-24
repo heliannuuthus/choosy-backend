@@ -63,12 +63,14 @@ func (c *Client) GetLocation(lat, lng float64) (*Location, error) {
 
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("请求高德 API 失败: %w", err)
 	}
 	defer resp.Body.Close()
 
 	var result struct {
 		Status    string `json:"status"`
+		Info      string `json:"info"`
+		Infocode  string `json:"infocode"`
 		Regeocode struct {
 			AddressComponent struct {
 				Province string `json:"province"`
@@ -80,11 +82,11 @@ func (c *Client) GetLocation(lat, lng float64) (*Location, error) {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("解析高德响应失败: %w", err)
 	}
 
 	if result.Status != "1" {
-		return nil, fmt.Errorf("高德 API 错误")
+		return nil, fmt.Errorf("高德 API 错误: %s (code: %s)", result.Info, result.Infocode)
 	}
 
 	addr := result.Regeocode.AddressComponent

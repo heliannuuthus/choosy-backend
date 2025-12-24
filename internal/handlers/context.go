@@ -5,9 +5,11 @@ import (
 	"time"
 
 	"choosy-backend/internal/amap"
+	"choosy-backend/internal/logger"
 	"choosy-backend/internal/utils"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 // ContextHandler 上下文处理器
@@ -79,8 +81,11 @@ func (h *ContextHandler) GetContext(c *gin.Context) {
 
 	response := ContextResponse{}
 
+	logger.Debug("获取位置", zap.Float64("lat", req.Latitude), zap.Float64("lng", req.Longitude))
 	location, err := h.amap.GetLocation(req.Latitude, req.Longitude)
-	if err == nil {
+	if err != nil {
+		logger.Error("高德逆地理编码失败", zap.Error(err), zap.Float64("lat", req.Latitude), zap.Float64("lng", req.Longitude))
+	} else {
 		response.Location = &LocationInfo{
 			Province: location.Province,
 			City:     location.City,
