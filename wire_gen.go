@@ -7,11 +7,18 @@
 package main
 
 import (
+	"choosy-backend/internal/auth"
 	"choosy-backend/internal/database"
+	"choosy-backend/internal/favorite"
 	"choosy-backend/internal/handlers"
-
+	"choosy-backend/internal/recipe"
+	"choosy-backend/internal/recommend"
+	"choosy-backend/internal/tag"
+	"github.com/google/wire"
 	"gorm.io/gorm"
+)
 
+import (
 	_ "choosy-backend/docs"
 )
 
@@ -37,6 +44,11 @@ func InitializeApp() (*App, error) {
 	}
 	return app, nil
 }
+
+// wire.go:
+
+// ProviderSet 提供者集合
+var ProviderSet = wire.NewSet(database.Get, recipe.NewService, auth.NewService, favorite.NewService, tag.NewService, recommend.NewService, handlers.NewRecipeHandler, handlers.NewAuthHandler, handlers.NewFavoriteHandler, handlers.NewHomeHandler, handlers.NewTagHandler, handlers.NewRecommendHandler)
 
 // App 应用依赖容器
 type App struct {
