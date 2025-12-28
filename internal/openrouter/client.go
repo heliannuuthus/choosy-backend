@@ -97,4 +97,3 @@ func (c *Client) ChatStream(ctx context.Context, messages []openai.ChatCompletio
 func (c *Client) Model() string {
 	return c.model
 }
-
