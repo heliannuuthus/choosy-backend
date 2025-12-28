@@ -73,6 +73,7 @@ type Ingredient struct {
 	ID           uint     `gorm:"primaryKey;autoIncrement;column:_id" json:"-"`
 	RecipeID     string   `gorm:"not null;index;column:recipe_id" json:"-"`
 	Name         string   `gorm:"not null" json:"name"`
+	Category     *string  `gorm:"index" json:"category"`
 	Quantity     *float64 `json:"quantity"`
 	Unit         *string  `json:"unit"`
 	TextQuantity string   `gorm:"not null;column:text_quantity" json:"text_quantity"`

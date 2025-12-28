@@ -1164,6 +1164,9 @@ const docTemplate = `{
         "handlers.IngredientResponse": {
             "type": "object",
             "properties": {
+                "category": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },

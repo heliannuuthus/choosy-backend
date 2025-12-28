@@ -120,6 +120,7 @@ type RecipeResponse struct {
 type IngredientResponse struct {
 	ID           uint     `json:"id"`
 	Name         string   `json:"name"`
+	Category     *string  `json:"category"`
 	Quantity     *float64 `json:"quantity"`
 	Unit         *string  `json:"unit"`
 	TextQuantity string   `json:"text_quantity"`
@@ -529,6 +530,7 @@ func (h *RecipeHandler) toRecipeResponse(r *models.Recipe) *RecipeResponse {
 		ingredients[i] = IngredientResponse{
 			ID:           ing.ID,
 			Name:         ing.Name,
+			Category:     ing.Category,
 			Quantity:     ing.Quantity,
 			Unit:         ing.Unit,
 			TextQuantity: ing.TextQuantity,
