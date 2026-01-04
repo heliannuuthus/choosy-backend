@@ -2,6 +2,8 @@
 
 BINARY := choosy-backend
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+BUILD_DATE := $(shell date +%Y%m%d)
+IMAGE_TAG := $(VERSION)-$(BUILD_DATE)
 LDFLAGS := -ldflags="-s -w -X main.Version=$(VERSION)"
 
 all: generate build
@@ -47,10 +49,10 @@ clean:
 	rm -rf dist/
 
 docker-build:
-	docker build -t $(BINARY):$(VERSION) .
+	docker build -t $(BINARY):$(IMAGE_TAG) -t $(BINARY):latest .
 
 docker-run:
-	docker run -p 18000:18000 -v $(PWD)/config.toml:/app/config.toml $(BINARY):$(VERSION)
+	docker run -p 18000:18000 -v $(PWD)/config.toml:/app/config.toml $(BINARY):$(IMAGE_TAG)
 
 help:
 	@echo "可用命令:"
@@ -64,6 +66,6 @@ help:
 	@echo "  make swag       - 生成 swagger 文档"
 	@echo "  make migrate    - 运行数据库迁移"
 	@echo "  make clean      - 清理构建产物"
-	@echo "  make docker-build - 构建 Docker 镜像"
+	@echo "  make docker-build - 构建 Docker 镜像 (tag: $(IMAGE_TAG))"
 	@echo "  make docker-run   - 运行 Docker 容器"
 

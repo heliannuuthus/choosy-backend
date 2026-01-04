@@ -1,25 +1,32 @@
-FROM golang:1.23-alpine AS builder
+# syntax=docker/dockerfile:1
+
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
 RUN apk add --no-cache gcc musl-dev
 
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
 COPY . .
-RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o choosy-backend .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=1 go build -ldflags="-s -w" -o choosy-backend .
 
-FROM alpine:latest
+FROM alpine:3.21
 
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata && \
+    adduser -D -u 1000 app
 
 WORKDIR /app
 
 COPY --from=builder /app/choosy-backend .
 COPY config.example.toml ./config.toml
 
+USER app
+
 EXPOSE 18000
 
 CMD ["./choosy-backend"]
-
