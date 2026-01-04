@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master, main]
   pull_request:
-    branches: [main, develop]
+    branches: [master, main]
 
 jobs:
   lint:
@@ -14,30 +14,8 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: "1.24"
           cache: true
-
-      - name: Tidy dependencies
-        run: go mod tidy
-
-      - name: Install tools
-        run: |
-          go install github.com/google/wire/cmd/wire@latest
-          go install github.com/swaggo/swag/cmd/swag@latest
-
-      - name: Generate wire
-        run: wire ./...
-
-      - name: Generate swagger
-        run: swag init --parseDependency --parseInternal
-
-      - name: Check generated code
-        run: |
-          if [ -n "$(git status --porcelain docs/ wire_gen.go)" ]; then
-            echo "::error::Generated code is out of date. Run 'make generate' and commit."
-            git diff docs/ wire_gen.go
-            exit 1
-          fi
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
@@ -46,49 +24,61 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    needs: [lint]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: "1.24"
           cache: true
 
-      - name: Tidy dependencies
-        run: go mod tidy
-
       - name: Run tests
-        run: go test -v -race -coverprofile=coverage.out ./...
+        run: go test -race -coverprofile=coverage.out ./...
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
           files: coverage.out
-          fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
 
-  build:
+  check-generate:
     runs-on: ubuntu-latest
-    needs: [test]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: "1.24"
           cache: true
 
-      - name: Tidy dependencies
-        run: go mod tidy
+      - name: Install tools
+        run: |
+          go install github.com/google/wire/cmd/wire@latest
+          go install github.com/swaggo/swag/cmd/swag@latest
+
+      - name: Generate
+        run: |
+          wire ./...
+          swag init --parseDependency --parseInternal
+
+      - name: Check for changes
+        run: |
+          if [ -n "$(git status --porcelain docs/ wire_gen.go)" ]; then
+            echo "::error::生成的代码有变更，请先运行 make generate 并提交"
+            git diff docs/ wire_gen.go
+            exit 1
+          fi
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [lint, test, check-generate]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
 
       - name: Build
         run: go build -ldflags="-s -w" -o choosy-backend .
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: choosy-backend
-          path: choosy-backend
-          retention-days: 7
