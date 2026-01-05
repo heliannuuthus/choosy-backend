@@ -4,10 +4,6 @@ on:
   workflow_run:
     workflows: ["Docker Build & Push"]
     types: [completed]
-    branches: [main, master]
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       image_tag:
@@ -21,7 +17,7 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     environment: production
     steps:
       - uses: actions/checkout@v4
@@ -32,10 +28,18 @@ jobs:
         id: tag
         run: |
           if [ -n "${{ inputs.image_tag }}" ]; then
+            # 手动触发时使用指定的 tag
             IMAGE_TAG="${{ inputs.image_tag }}"
-          elif [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            # tag push 时使用版本号
-            IMAGE_TAG="${GITHUB_REF#refs/tags/}"
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            # 从上游 workflow 获取 ref
+            REF="${{ github.event.workflow_run.head_branch }}"
+            if [[ "$REF" == v* ]]; then
+              # tag 触发的 build，使用版本号
+              IMAGE_TAG="${REF}"
+            else
+              # branch 触发的 build，使用 latest
+              IMAGE_TAG="latest"
+            fi
           else
             IMAGE_TAG="latest"
           fi
