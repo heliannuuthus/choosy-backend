@@ -10,13 +10,6 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Deploy environment'
-        required: true
-        type: choice
-        options:
-          - staging
-          - production
       image_tag:
         description: 'Image tag to deploy (leave empty for latest)'
         required: false
@@ -29,40 +22,26 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
-    environment: ${{ github.event_name == 'push' && 'production' || inputs.environment || 'production' }}
+    environment: production
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set environment and image tag
-        id: env
+      - name: Set image tag
+        id: tag
         run: |
-          # 确定环境
-          if [ "${{ github.event_name }}" = "push" ]; then
-            ENV="production"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            ENV="${{ inputs.environment }}"
-          else
-            ENV="production"
-          fi
-          echo "env=${ENV}" >> $GITHUB_OUTPUT
-          
-          # 确定镜像 tag
           if [ -n "${{ inputs.image_tag }}" ]; then
-            # 手动指定的 tag
             IMAGE_TAG="${{ inputs.image_tag }}"
           elif [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            # Tag 推送时，使用 docker.yml 生成的格式
             TIMESTAMP=$(date +%Y%m%d-%H%M%S)
             COMMIT_SHA=$(git rev-parse --short HEAD)
             IMAGE_TAG="${TIMESTAMP}-${COMMIT_SHA}"
           else
-            # 默认使用 latest
             IMAGE_TAG="latest"
           fi
           echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-          echo "Deploy env: ${ENV}, image tag: ${IMAGE_TAG}"
+          echo "Deploy image tag: ${IMAGE_TAG}"
 
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.2.0
@@ -73,51 +52,42 @@ jobs:
           script: |
             set -e
             
-            # 使用 VPC 内网地址（阿里云 ACR）
             REG_VPC_ENDPOINT="${{ vars.REG_VPC_ENDPOINT }}"
             REG_USERNAME="${{ secrets.REG_USERNAME }}"
             REG_PASSWORD="${{ secrets.REG_PASSWORD }}"
             IMAGE_NAME="${{ env.IMAGE_NAME }}"
-            IMAGE_TAG="${{ steps.env.outputs.image_tag }}"
-            ENV="${{ steps.env.outputs.env }}"
+            IMAGE_TAG="${{ steps.tag.outputs.image_tag }}"
             
-            # 镜像地址（使用 VPC 内网）
             IMAGE="${REG_VPC_ENDPOINT}/${REG_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}"
-            CONTAINER_NAME="choosy-backend-${ENV}"
+            CONTAINER_NAME="choosy-backend"
             
             echo "=== Deploying ${CONTAINER_NAME} ==="
             echo "Image: ${IMAGE}"
             
-            # 登录镜像仓库（nerdctl for containerd，需要 sudo）
             echo "${REG_PASSWORD}" | sudo nerdctl login ${REG_VPC_ENDPOINT} -u ${REG_USERNAME} --password-stdin
             
-            # 拉取镜像
             echo "Pulling image..."
             sudo nerdctl pull ${IMAGE}
             
-            # 停止并删除旧容器
             echo "Stopping old container..."
             sudo nerdctl stop ${CONTAINER_NAME} 2>/dev/null || true
             sudo nerdctl rm ${CONTAINER_NAME} 2>/dev/null || true
             
-            # 启动新容器
-            PORT=$([[ "${ENV}" == "production" ]] && echo "18000" || echo "18001")
-            echo "Starting new container on port ${PORT}..."
+            echo "Starting new container..."
             sudo nerdctl run -d \
               --name ${CONTAINER_NAME} \
               --restart unless-stopped \
-              -p ${PORT}:18000 \
-              -v /opt/choosy/${ENV}/config.toml:/app/config.toml \
-              -v /opt/choosy/${ENV}/db:/app/db \
+              -p 18000:18000 \
+              -v /opt/choosy/config.toml:/app/config.toml \
+              -v /opt/choosy/db:/app/db \
               ${IMAGE}
             
-            echo "=== Container ${CONTAINER_NAME} started on port ${PORT} ==="
+            echo "=== Container ${CONTAINER_NAME} started ==="
             sudo nerdctl ps | grep ${CONTAINER_NAME}
 
       - name: Health check
         run: |
           sleep 10
-          PORT=${{ steps.env.outputs.env == 'production' && '18000' || '18001' }}
-          echo "Health check: http://${{ secrets.DEPLOY_HOST }}:${PORT}/health"
-          curl -f http://${{ secrets.DEPLOY_HOST }}:${PORT}/health || exit 1
+          echo "Health check: http://${{ secrets.DEPLOY_HOST }}:18000/health"
+          curl -f http://${{ secrets.DEPLOY_HOST }}:18000/health || exit 1
           echo "Health check passed!"
