@@ -15,9 +15,9 @@ import (
 
 const (
 	categoriesCacheKey = "categories"
-	cacheMaxCost       = 100 // 最大成本（分类数据很小，100 足够）
-	cacheNumCounters   = 1000 // 计数器数量（用于统计）
-	cacheBufferItems   = 64  // 缓冲区大小
+	cacheMaxCost       = 100              // 最大成本（分类数据很小，100 足够）
+	cacheNumCounters   = 1000             // 计数器数量（用于统计）
+	cacheBufferItems   = 64               // 缓冲区大小
 	refreshInterval    = 10 * time.Minute // 刷新间隔
 	refreshTimeout     = 5 * time.Second  // 刷新超时时间
 )
@@ -30,7 +30,6 @@ type categoryCacheRefresher struct {
 	isRefreshing  bool
 	refreshTicker *time.Ticker
 	stopChan      chan struct{}
-	stopped       bool
 }
 
 // newCategoryCacheRefresher 创建分类缓存刷新器
@@ -81,7 +80,7 @@ func (r *categoryCacheRefresher) refresh() {
 
 		ctx, cancel := context.WithTimeout(context.Background(), refreshTimeout)
 		defer cancel()
-		r.doRefresh(ctx)
+		_ = r.doRefresh(ctx)
 	}()
 }
 
@@ -93,7 +92,7 @@ func (r *categoryCacheRefresher) start() {
 
 	// 首次同步刷新，确保启动时有数据
 	ctx, cancel := context.WithTimeout(context.Background(), refreshTimeout)
-	r.doRefresh(ctx)
+	_ = r.doRefresh(ctx)
 	cancel()
 
 	// 启动定期刷新协程
@@ -110,33 +109,17 @@ func (r *categoryCacheRefresher) start() {
 	}()
 }
 
-// stop 停止刷新（幂等）
-func (r *categoryCacheRefresher) stop() {
-	r.refreshMutex.Lock()
-	defer r.refreshMutex.Unlock()
-
-	if r.stopped {
-		return
-	}
-	r.stopped = true
-
-	if r.refreshTicker != nil {
-		r.refreshTicker.Stop()
-	}
-	close(r.stopChan)
-}
-
 // Service 菜谱服务
 type Service struct {
-	db                    *gorm.DB
-	categoriesCache       *ristretto.Cache
+	db                     *gorm.DB
+	categoriesCache        *ristretto.Cache
 	categoryCacheRefresher *categoryCacheRefresher
 }
 
 // NewService 创建菜谱服务
 func NewService(db *gorm.DB) *Service {
 	s := &Service{db: db}
-	
+
 	// 初始化 Ristretto 缓存
 	cache, err := ristretto.NewCache(&ristretto.Config{
 		NumCounters: cacheNumCounters,
@@ -148,14 +131,14 @@ func NewService(db *gorm.DB) *Service {
 		return s
 	}
 	s.categoriesCache = cache
-	
+
 	// 等待缓存初始化完成
 	s.categoriesCache.Wait()
-	
+
 	// 创建并启动分类缓存刷新器
 	s.categoryCacheRefresher = newCategoryCacheRefresher(db, cache)
 	s.categoryCacheRefresher.start()
-	
+
 	return s
 }
 

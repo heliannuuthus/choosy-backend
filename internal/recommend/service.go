@@ -195,7 +195,7 @@ func (s *Service) getUserHistory(userID string) (*UserHistory, error) {
 		s.db.Where("recipe_id IN ?", favoriteIDs).Find(&recipes)
 
 		// 填充标签
-		s.fillTags(recipes)
+		_ = s.fillTags(recipes)
 
 		for _, r := range recipes {
 			tags := make([]string, len(r.Tags))
@@ -234,7 +234,7 @@ func (s *Service) getLLMRecommendations(result *Result, userHistory *UserHistory
 	}
 
 	// 填充标签
-	s.fillTags(allRecipes)
+	_ = s.fillTags(allRecipes)
 
 	// 2. 构建候选菜谱列表
 	type CandidateRecipe struct {
@@ -483,7 +483,7 @@ func (s *Service) getRecipeDetails(ids []string) []map[string]interface{} {
 		return []map[string]interface{}{}
 	}
 
-	s.fillTags(recipes)
+	_ = s.fillTags(recipes)
 
 	details := make([]map[string]interface{}, len(recipes))
 	for i, r := range recipes {
@@ -568,7 +568,7 @@ func (s *Service) getFallbackRecommendations(result *Result, limit int) (*Result
 		return nil, err
 	}
 
-	s.fillTags(recipes)
+	_ = s.fillTags(recipes)
 
 	result.Recipes = recipes
 	result.Reason = "为您推荐一些美味菜品"

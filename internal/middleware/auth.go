@@ -51,9 +51,9 @@ func RequireAuth() gin.HandlerFunc {
 
 		identity, err := auth.VerifyAccessToken(token)
 		if err != nil || identity == nil {
-			logger.Warnf("[Auth] Token 验证失败 - Path: %s, IP: %s, Error: %v, TokenPreview: %s...", 
-				c.Request.URL.Path, 
-				c.ClientIP(), 
+			logger.Warnf("[Auth] Token 验证失败 - Path: %s, IP: %s, Error: %v, TokenPreview: %s...",
+				c.Request.URL.Path,
+				c.ClientIP(),
 				err,
 				tokenPreview(token, 20))
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"detail": "未登录或登录已过期"})

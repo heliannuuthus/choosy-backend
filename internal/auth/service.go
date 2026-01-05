@@ -59,14 +59,11 @@ func (s *Service) WxCode2Session(code string) (*WxCode2SessionResponse, error) {
 		return nil, fmt.Errorf("微信登录失败: %s", result.ErrMsg)
 	}
 
-	logger.Infof("[Auth] 微信登录成功 - T_OpenID: %s, UnionID: %s", 
-		result.OpenID, 
-		func() string {
-			if result.UnionID != "" {
-				return result.UnionID
-			}
-			return "(无)"
-		}())
+	unionID := "(无)"
+	if result.UnionID != "" {
+		unionID = result.UnionID
+	}
+	logger.Infof("[Auth] 微信登录成功 - T_OpenID: %s, UnionID: %s", result.OpenID, unionID)
 
 	return &result, nil
 }

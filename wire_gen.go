@@ -31,7 +31,6 @@ func InitializeApp() (*App, error) {
 	recipeHandler := handlers.NewRecipeHandler(db)
 	authHandler := handlers.NewAuthHandler(db)
 	favoriteHandler := handlers.NewFavoriteHandler(db)
-	historyService := history.NewService(db)
 	historyHandler := handlers.NewHistoryHandler(db)
 	homeHandler := handlers.NewHomeHandler(db)
 	tagHandler := handlers.NewTagHandler(db)
@@ -46,7 +45,6 @@ func InitializeApp() (*App, error) {
 		TagHandler:       tagHandler,
 		RecommendHandler: recommendHandler,
 	}
-	_ = historyService
 	return app, nil
 }
 

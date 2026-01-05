@@ -20,4 +20,3 @@ type ViewHistory struct {
 func (ViewHistory) TableName() string {
 	return "view_history"
 }
-

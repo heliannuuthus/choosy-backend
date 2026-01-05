@@ -94,6 +94,38 @@ definitions:
       recipe_id:
         type: string
     type: object
+  handlers.HistoryListItem:
+    properties:
+      recipe:
+        $ref: '#/definitions/handlers.RecipeListItem'
+      recipe_id:
+        type: string
+      viewed_at:
+        type: string
+    type: object
+  handlers.HistoryListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/handlers.HistoryListItem'
+        type: array
+      total:
+        type: integer
+    type: object
+  handlers.HistoryRequest:
+    properties:
+      recipe_id:
+        type: string
+    required:
+    - recipe_id
+    type: object
+  handlers.HistoryResponse:
+    properties:
+      recipe_id:
+        type: string
+      viewed_at:
+        type: string
+    type: object
   handlers.IngredientRequest:
     properties:
       name:
@@ -757,6 +789,108 @@ paths:
       summary: 批量检查收藏状态
       tags:
       - favorites
+  /api/history:
+    delete:
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 清空浏览历史
+      tags:
+      - history
+    get:
+      parameters:
+      - description: 分类筛选
+        in: query
+        name: category
+        type: string
+      - description: 搜索关键词
+        in: query
+        name: search
+        type: string
+      - default: 20
+        description: 限制数量
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: 偏移量
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.HistoryListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 获取浏览历史列表
+      tags:
+      - history
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 浏览记录信息
+        in: body
+        name: history
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.HistoryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.HistoryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 添加浏览记录
+      tags:
+      - history
+  /api/history/{recipe_id}:
+    delete:
+      parameters:
+      - description: 菜谱ID
+        in: path
+        name: recipe_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 删除浏览记录
+      tags:
+      - history
   /api/home/banners:
     get:
       produces:
@@ -987,7 +1121,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: 根据地理位置、天气、时间等因素智能推荐菜谱
+      description: 根据地理位置、天气、时间等因素智能推荐菜谱（基于 LLM，支持用户个性化）
       parameters:
       - description: 推荐请求
         in: body

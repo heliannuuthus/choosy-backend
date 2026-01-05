@@ -130,18 +130,18 @@ func main() {
 			tags.GET("/scenes", app.TagHandler.GetScenes)
 		}
 
-	// 推荐路由
-	contextHandler := handlers.NewContextHandler()
-	recommend := api.Group("/recommend")
-	{
-		// LLM 推荐菜谱（支持可选认证）
-		recommend.Use(middleware.AuthMiddleware())
-		recommend.POST("", app.RecommendHandler.GetRecommendations)
-		
-		// 获取上下文信息（需要登录）
-		recommend.Use(middleware.RequireAuth())
-		recommend.POST("/context", contextHandler.GetContext)
-	}
+		// 推荐路由
+		contextHandler := handlers.NewContextHandler()
+		recommend := api.Group("/recommend")
+		{
+			// LLM 推荐菜谱（支持可选认证）
+			recommend.Use(middleware.AuthMiddleware())
+			recommend.POST("", app.RecommendHandler.GetRecommendations)
+
+			// 获取上下文信息（需要登录）
+			recommend.Use(middleware.RequireAuth())
+			recommend.POST("/context", contextHandler.GetContext)
+		}
 	}
 
 	// 启动服务器
