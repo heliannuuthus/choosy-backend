@@ -320,8 +320,35 @@ definitions:
       total_time_minutes:
         type: integer
     type: object
+  handlers.RecommendRecipeItem:
+    properties:
+      category:
+        type: string
+      description:
+        type: string
+      difficulty:
+        type: integer
+      id:
+        type: string
+      image_path:
+        type: string
+      name:
+        type: string
+      reason:
+        description: 该菜品的推荐理由
+        type: string
+      tags:
+        $ref: '#/definitions/handlers.TagsGrouped'
+      total_time_minutes:
+        type: integer
+    type: object
   handlers.RecommendRequest:
     properties:
+      exclude_ids:
+        description: 排除的菜谱 ID（换一批时传入已推荐的）
+        items:
+          type: string
+        type: array
       latitude:
         type: number
       longitude:
@@ -334,20 +361,16 @@ definitions:
     type: object
   handlers.RecommendResponse:
     properties:
-      meal_time:
-        type: string
-      reason:
-        type: string
       recipes:
         items:
-          $ref: '#/definitions/handlers.RecipeListItem'
+          $ref: '#/definitions/handlers.RecommendRecipeItem'
         type: array
-      season:
+      remaining:
+        description: 今日剩余推荐次数
+        type: integer
+      summary:
+        description: LLM 生成的一句话整体评价
         type: string
-      temperature:
-        type: string
-      weather:
-        $ref: '#/definitions/handlers.WeatherResponse'
     type: object
   handlers.StepRequest:
     properties:
@@ -438,17 +461,6 @@ definitions:
         type: integer
       icon:
         type: string
-      temperature:
-        type: number
-      weather:
-        type: string
-    type: object
-  handlers.WeatherResponse:
-    properties:
-      city:
-        type: string
-      humidity:
-        type: integer
       temperature:
         type: number
       weather:

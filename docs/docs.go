@@ -1636,6 +1636,39 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.RecommendRecipeItem": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "difficulty": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "image_path": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "reason": {
+                    "description": "该菜品的推荐理由",
+                    "type": "string"
+                },
+                "tags": {
+                    "$ref": "#/definitions/handlers.TagsGrouped"
+                },
+                "total_time_minutes": {
+                    "type": "integer"
+                }
+            }
+        },
         "handlers.RecommendRequest": {
             "type": "object",
             "required": [
@@ -1643,6 +1676,13 @@ const docTemplate = `{
                 "longitude"
             ],
             "properties": {
+                "exclude_ids": {
+                    "description": "排除的菜谱 ID（换一批时传入已推荐的）",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "latitude": {
                     "type": "number"
                 },
@@ -1657,26 +1697,19 @@ const docTemplate = `{
         "handlers.RecommendResponse": {
             "type": "object",
             "properties": {
-                "meal_time": {
-                    "type": "string"
-                },
-                "reason": {
-                    "type": "string"
-                },
                 "recipes": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/handlers.RecipeListItem"
+                        "$ref": "#/definitions/handlers.RecommendRecipeItem"
                     }
                 },
-                "season": {
-                    "type": "string"
+                "remaining": {
+                    "description": "今日剩余推荐次数",
+                    "type": "integer"
                 },
-                "temperature": {
+                "summary": {
+                    "description": "LLM 生成的一句话整体评价",
                     "type": "string"
-                },
-                "weather": {
-                    "$ref": "#/definitions/handlers.WeatherResponse"
                 }
             }
         },
@@ -1815,23 +1848,6 @@ const docTemplate = `{
                 },
                 "icon": {
                     "type": "string"
-                },
-                "temperature": {
-                    "type": "number"
-                },
-                "weather": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.WeatherResponse": {
-            "type": "object",
-            "properties": {
-                "city": {
-                    "type": "string"
-                },
-                "humidity": {
-                    "type": "integer"
                 },
                 "temperature": {
                     "type": "number"
