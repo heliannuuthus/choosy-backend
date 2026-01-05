@@ -193,9 +193,14 @@ jobs:
             sudo nerdctl ps | grep ${CONTAINER_NAME}
 
       - name: Health check
-        run: |
-          sleep 10
-          echo "Health check: http://${{ secrets.DEPLOY_HOST }}:18000/health"
-          curl -f http://${{ secrets.DEPLOY_HOST }}:18000/health || exit 1
-          echo "Health check passed!"
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            sleep 5
+            echo "Health check via localhost..."
+            curl -f http://localhost:18000/health || exit 1
+            echo "Health check passed!"
 
