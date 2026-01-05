@@ -15,37 +15,45 @@ env:
   IMAGE_NAME: choosy-backend
 
 jobs:
-  deploy:
+  # 准备部署信息
+  prepare:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
-    environment: production
+    outputs:
+      image_tag: ${{ steps.tag.outputs.image_tag }}
+      needs_approval: ${{ steps.tag.outputs.needs_approval }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Set image tag
         id: tag
         run: |
           if [ -n "${{ inputs.image_tag }}" ]; then
-            # 手动触发时使用指定的 tag
             IMAGE_TAG="${{ inputs.image_tag }}"
+            NEEDS_APPROVAL="true"
           elif [ "${{ github.event_name }}" = "workflow_run" ]; then
-            # 从上游 workflow 获取 ref
             REF="${{ github.event.workflow_run.head_branch }}"
             if [[ "$REF" == v* ]]; then
-              # tag 触发的 build，使用版本号
               IMAGE_TAG="${REF}"
+              NEEDS_APPROVAL="true"
             else
-              # branch 触发的 build，使用 latest
               IMAGE_TAG="latest"
+              NEEDS_APPROVAL="false"
             fi
           else
             IMAGE_TAG="latest"
+            NEEDS_APPROVAL="false"
           fi
           echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-          echo "Deploy image tag: ${IMAGE_TAG}"
+          echo "needs_approval=${NEEDS_APPROVAL}" >> $GITHUB_OUTPUT
+          echo "Image tag: ${IMAGE_TAG}, Needs approval: ${NEEDS_APPROVAL}"
 
+  # 需要审批的部署（tag 发布）
+  # 需要审批的部署（tag 发布或手动触发）
+  deploy-with-approval:
+    needs: prepare
+    if: ${{ needs.prepare.outputs.needs_approval == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -59,7 +67,62 @@ jobs:
             REG_USERNAME="${{ secrets.REG_USERNAME }}"
             REG_PASSWORD="${{ secrets.REG_PASSWORD }}"
             IMAGE_NAME="${{ env.IMAGE_NAME }}"
-            IMAGE_TAG="${{ steps.tag.outputs.image_tag }}"
+            IMAGE_TAG="${{ needs.prepare.outputs.image_tag }}"
+            
+            IMAGE="${REG_VPC_ENDPOINT}/${REG_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}"
+            CONTAINER_NAME="choosy-backend"
+            
+            echo "=== Deploying ${CONTAINER_NAME} ==="
+            echo "Image: ${IMAGE}"
+            
+            echo "${REG_PASSWORD}" | sudo nerdctl login ${REG_VPC_ENDPOINT} -u ${REG_USERNAME} --password-stdin
+            
+            echo "Pulling image..."
+            sudo nerdctl pull ${IMAGE}
+            
+            echo "Stopping old container..."
+            sudo nerdctl stop ${CONTAINER_NAME} 2>/dev/null || true
+            sudo nerdctl rm ${CONTAINER_NAME} 2>/dev/null || true
+            
+            echo "Starting new container..."
+            sudo nerdctl run -d \
+              --name ${CONTAINER_NAME} \
+              --restart unless-stopped \
+              -p 18000:18000 \
+              -v /opt/choosy/config.toml:/app/config.toml \
+              -v /opt/choosy/db:/app/db \
+              ${IMAGE}
+            
+            echo "=== Container ${CONTAINER_NAME} started ==="
+            sudo nerdctl ps | grep ${CONTAINER_NAME}
+
+      - name: Health check
+        run: |
+          sleep 10
+          echo "Health check: http://${{ secrets.DEPLOY_HOST }}:18000/health"
+          curl -f http://${{ secrets.DEPLOY_HOST }}:18000/health || exit 1
+          echo "Health check passed!"
+
+  # 自动部署（main 分支，无需审批）
+  deploy-auto:
+    needs: prepare
+    if: ${{ needs.prepare.outputs.needs_approval == 'false' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            
+            REG_VPC_ENDPOINT="${{ vars.REG_VPC_ENDPOINT }}"
+            REG_USERNAME="${{ secrets.REG_USERNAME }}"
+            REG_PASSWORD="${{ secrets.REG_PASSWORD }}"
+            IMAGE_NAME="${{ env.IMAGE_NAME }}"
+            IMAGE_TAG="${{ needs.prepare.outputs.image_tag }}"
             
             IMAGE="${REG_VPC_ENDPOINT}/${REG_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}"
             CONTAINER_NAME="choosy-backend"
