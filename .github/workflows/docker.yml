@@ -34,18 +34,20 @@ jobs:
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           # 短 commit hash
           COMMIT_SHA=$(git rev-parse --short HEAD)
-          # 完整 tag：日期时间-commit
-          TAG="${TIMESTAMP}-${COMMIT_SHA}"
           
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            # tag push 时使用版本号
             VERSION=${GITHUB_REF#refs/tags/}
+            TAG="${VERSION}"
           else
+            # branch push 时使用时间戳-commit
+            TAG="${TIMESTAMP}-${COMMIT_SHA}"
             VERSION="${TAG}"
           fi
           
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "Generated tag: ${TAG}"
+          echo "Generated tag: ${TAG}, version: ${VERSION}"
 
       - name: Build and push
         uses: docker/build-push-action@v6

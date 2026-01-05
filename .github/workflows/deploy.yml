@@ -34,9 +34,8 @@ jobs:
           if [ -n "${{ inputs.image_tag }}" ]; then
             IMAGE_TAG="${{ inputs.image_tag }}"
           elif [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-            COMMIT_SHA=$(git rev-parse --short HEAD)
-            IMAGE_TAG="${TIMESTAMP}-${COMMIT_SHA}"
+            # tag push 时使用版本号
+            IMAGE_TAG="${GITHUB_REF#refs/tags/}"
           else
             IMAGE_TAG="latest"
           fi
