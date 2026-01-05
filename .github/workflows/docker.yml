@@ -30,14 +30,22 @@ jobs:
       - name: Generate image tags
         id: meta
         run: |
-          DATE=$(date +%Y%m%d)
+          # 格式：YYYYMMDD-HHMMSS
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          # 短 commit hash
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          # 完整 tag：日期时间-commit
+          TAG="${TIMESTAMP}-${COMMIT_SHA}"
+          
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             VERSION=${GITHUB_REF#refs/tags/}
           else
-            VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+            VERSION="${TAG}"
           fi
+          
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "date=${DATE}" >> $GITHUB_OUTPUT
+          echo "Generated tag: ${TAG}"
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -45,8 +53,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ vars.REG_ENDPOINT }}/${{ secrets.REG_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.date }}
-            ${{ vars.REG_ENDPOINT }}/${{ secrets.REG_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+            ${{ vars.REG_ENDPOINT }}/${{ secrets.REG_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
             ${{ vars.REG_ENDPOINT }}/${{ secrets.REG_USERNAME }}/${{ env.IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
