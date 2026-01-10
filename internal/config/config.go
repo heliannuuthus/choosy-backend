@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -34,6 +35,13 @@ func Load() {
 	v.SetEnvPrefix("CHOOSY")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
+
+	// 特殊处理：APP_ENV 环境变量（不带前缀，直接读取）
+	// Dockerfile 设置的 ENV APP_ENV=prod 会直接作为环境变量
+	// 也支持 CHOOSY_APP_ENV（通过 AutomaticEnv 自动绑定）
+	if appEnv := os.Getenv("APP_ENV"); appEnv != "" {
+		v.Set("APP_ENV", appEnv)
+	}
 
 	// 读取配置文件
 	if err := v.ReadInConfig(); err != nil {

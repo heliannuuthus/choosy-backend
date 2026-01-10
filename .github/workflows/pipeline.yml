@@ -141,6 +141,7 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             VERSION=${{ steps.meta.outputs.version }}
+            ENV=${{ github.ref == 'refs/heads/main' && 'prod' || '' }}
           provenance: false
 
   # ========== Deploy ==========
@@ -185,6 +186,7 @@ jobs:
               --name ${CONTAINER_NAME} \
               --restart unless-stopped \
               -p 18000:18000 \
+              -e APP_ENV=prod \
               -v /opt/choosy/config.toml:/app/config.toml \
               -v /opt/choosy/db:/app/db \
               ${IMAGE}

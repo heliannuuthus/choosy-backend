@@ -25,6 +25,10 @@ WORKDIR /app
 COPY --from=builder /app/choosy-backend .
 COPY config.example.toml ./config.toml
 
+# 构建参数：环境标识（prod 表示生产环境，使用内网 OSS）
+ARG ENV=""
+ENV APP_ENV=${ENV}
+
 USER app
 
 EXPOSE 18000

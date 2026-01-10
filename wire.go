@@ -33,6 +33,7 @@ var ProviderSet = wire.NewSet(
 	handlers.NewHomeHandler,
 	handlers.NewTagHandler,
 	handlers.NewRecommendHandler,
+	handlers.NewUploadHandler,
 )
 
 // App 应用依赖容器
@@ -45,6 +46,7 @@ type App struct {
 	HomeHandler      *handlers.HomeHandler
 	TagHandler       *handlers.TagHandler
 	RecommendHandler *handlers.RecommendHandler
+	UploadHandler    *handlers.UploadHandler
 }
 
 // InitializeApp 初始化应用（由 wire 生成）

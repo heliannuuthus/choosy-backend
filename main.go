@@ -7,6 +7,7 @@ import (
 	"choosy-backend/internal/handlers"
 	"choosy-backend/internal/logger"
 	"choosy-backend/internal/middleware"
+	"choosy-backend/internal/oss"
 
 	_ "choosy-backend/docs" // swagger docs
 
@@ -34,6 +35,20 @@ func main() {
 	// 初始化日志
 	logger.Init()
 	defer logger.Sync()
+
+	// 初始化 OSS（如果配置了）
+	if config.GetString("oss.endpoint") != "" {
+		if err := oss.Init(); err != nil {
+			logger.Warnf("OSS 初始化失败（将跳过图片上传功能）: %v", err)
+		} else {
+			// 初始化 STS（如果配置了）
+			if config.GetString("oss.role-arn") != "" {
+				if err := oss.InitSTS(); err != nil {
+					logger.Warnf("OSS STS 初始化失败（将使用主账号凭证）: %v", err)
+				}
+			}
+		}
+	}
 
 	// 通过 Wire 初始化应用
 	app, err := InitializeApp()
@@ -80,6 +95,7 @@ func main() {
 			auth.POST("/revoke-all", middleware.RequireAuth(), app.AuthHandler.LogoutAll)
 			auth.GET("/profile", middleware.RequireAuth(), app.AuthHandler.Profile)
 			auth.PUT("/profile", middleware.RequireAuth(), app.AuthHandler.UpdateProfile)
+			auth.GET("/stats", middleware.RequireAuth(), app.AuthHandler.GetStats) // 获取统计数据
 		}
 
 		// 菜谱路由
@@ -141,6 +157,13 @@ func main() {
 			// 获取上下文信息（需要登录）
 			recommend.Use(middleware.RequireAuth())
 			recommend.POST("/context", contextHandler.GetContext)
+		}
+
+		// 上传路由
+		upload := api.Group("/upload")
+		upload.Use(middleware.RequireAuth())
+		{
+			upload.POST("/image", app.UploadHandler.UploadImage)
 		}
 	}
 

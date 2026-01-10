@@ -249,7 +249,7 @@ type FavoriteCount struct {
 // GetHotRecipes 获取热门菜谱（按收藏数排序）
 func (s *Service) GetHotRecipes(limit int, excludeIDs []string) ([]models.Recipe, error) {
 	var counts []FavoriteCount
-	countQuery := s.db.Table("favorites").
+	countQuery := s.db.Model(&models.Favorite{}).
 		Select("recipe_id, COUNT(*) as count").
 		Group("recipe_id").
 		Order("count DESC")

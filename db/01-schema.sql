@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS t_user (
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_t_user_openid ON t_user(openid);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_t_user_phone ON t_user(phone);
+CREATE INDEX IF NOT EXISTS idx_t_user_phone ON t_user(phone);  -- 改为普通索引，支持多端数据互通（同一手机号可绑定多个账号）
 
 -- 用户身份表（多端绑定）
 CREATE TABLE IF NOT EXISTS t_user_identity (

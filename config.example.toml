@@ -72,3 +72,14 @@ image-url = "https://example.com/banner2.jpg"
 title = "新菜上线"
 link = "recipe_id_here"
 link-type = "recipe"
+
+# 阿里云 OSS 配置（用于图片上传）
+[oss]
+endpoint = ""           # OSS 地域节点，如 oss-cn-hangzhou.aliyuncs.com
+access-key-id = ""      # AccessKey ID
+access-key-secret = ""  # AccessKey Secret
+bucket = ""             # Bucket 名称
+domain = ""             # 自定义域名（可选），如 https://cdn.example.com，不配置则使用 OSS 默认域名
+region = ""             # STS 区域（可选，默认从 endpoint 提取）
+
+role-arn = ""           # RAM 角色 ARN，如 acs:ram::123456789012:role/oss-upload-role（STS 临时凭证配置，用于安全上传，1小时有效期）

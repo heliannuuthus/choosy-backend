@@ -274,7 +274,7 @@ func (h *AuthHandler) Profile(c *gin.Context) {
 
 type UpdateProfileRequest struct {
 	Nickname string `json:"nickname" binding:"omitempty,max=64"`
-	Avatar   string `json:"avatar" binding:"omitempty,url,max=512"`
+	Avatar   string `json:"avatar" binding:"omitempty,max=512"` // 移除 url 验证，允许临时路径或 OSS URL
 	Gender   *int8  `json:"gender" binding:"omitempty,oneof=0 1 2"`
 }
 
@@ -316,6 +316,8 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		updates["nickname"] = req.Nickname
 	}
 	if req.Avatar != "" {
+		// Avatar 字段现在应该已经是 OSS URL（由前端上传接口返回）
+		// 直接保存即可
 		updates["avatar"] = req.Avatar
 	}
 	if req.Gender != nil {
@@ -452,7 +454,7 @@ func (h *AuthHandler) BindPhone(c *gin.Context) {
 	// 计算手机号哈希（用于查询）
 	phoneHash := kms.Hash(phone)
 
-	// 检查手机号是否已被其他用户绑定
+	// 检查手机号是否已被其他用户绑定（全局不允许重复）
 	var existingUser models.User
 	if err := h.db.Where("phone = ? AND openid != ?", phoneHash, identity.GetOpenID()).First(&existingUser).Error; err == nil {
 		c.JSON(http.StatusConflict, OAuth2Error{
@@ -484,6 +486,52 @@ func (h *AuthHandler) BindPhone(c *gin.Context) {
 		identity.GetOpenID(), kms.MaskPhone(phone))
 
 	c.Status(http.StatusOK)
+}
+
+// StatsResponse 统计数据响应
+type StatsResponse struct {
+	Favorites int64 `json:"favorites"` // 收藏数
+	History   int64 `json:"history"`   // 浏览历史数
+}
+
+// GetStats 获取用户统计数据（收藏数、浏览历史数）
+// @Summary 获取用户统计数据
+// @Description 获取当前用户的收藏数和浏览历史数
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Success 200 {object} StatsResponse
+// @Failure 401 {object} map[string]string
+// @Router /api/auth/stats [get]
+func (h *AuthHandler) GetStats(c *gin.Context) {
+	user, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"detail": "未登录或登录已过期"})
+		return
+	}
+
+	identity := user.(*auth.Identity)
+	openID := identity.GetOpenID()
+
+	// 查询收藏数
+	var favoritesCount int64
+	if err := h.db.Model(&models.Favorite{}).Where("openid = ?", openID).Count(&favoritesCount).Error; err != nil {
+		logger.Errorf("[Auth] 查询收藏数失败 - OpenID: %s, Error: %v", openID, err)
+		favoritesCount = 0
+	}
+
+	// 查询浏览历史数
+	var historyCount int64
+	if err := h.db.Model(&models.ViewHistory{}).Where("openid = ?", openID).Count(&historyCount).Error; err != nil {
+		logger.Errorf("[Auth] 查询浏览历史数失败 - OpenID: %s, Error: %v", openID, err)
+		historyCount = 0
+	}
+
+	c.JSON(http.StatusOK, StatsResponse{
+		Favorites: favoritesCount,
+		History:   historyCount,
+	})
 }
 
 // getIDPFromContext 从请求上下文获取 idp

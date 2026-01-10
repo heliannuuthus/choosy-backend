@@ -10,7 +10,7 @@ type User struct {
 	OpenID         string     `gorm:"not null;uniqueIndex;column:openid;size:64" json:"openid"` // 系统生成的唯一标识，作为对外 ID
 	Nickname       string     `gorm:"not null;column:nickname;size:64" json:"nickname"`         // 昵称
 	Avatar         string     `gorm:"not null;column:avatar;size:512" json:"avatar"`            // 头像 URL
-	Phone          *string    `gorm:"column:phone;size:64;uniqueIndex" json:"-"`                // 手机号哈希（SHA256，用于查询）
+	Phone          *string    `gorm:"column:phone;size:64;index" json:"-"`                      // 手机号哈希（SHA256，用于查询，支持多端数据互通）
 	EncryptedPhone *string    `gorm:"column:encrypted_phone;size:128" json:"-"`                 // 手机号密文（AES-GCM，用于展示）
 	Gender         int8       `gorm:"not null;column:gender;default:0" json:"gender"`           // 性别 0未知 1男 2女
 	Status         int8       `gorm:"not null;column:status;default:0" json:"status"`           // 账号状态 0正常 1禁用

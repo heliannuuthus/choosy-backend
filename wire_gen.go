@@ -15,11 +15,10 @@ import (
 	"choosy-backend/internal/recipe"
 	"choosy-backend/internal/recommend"
 	"choosy-backend/internal/tag"
+
 	"github.com/google/wire"
 	"gorm.io/gorm"
-)
 
-import (
 	_ "choosy-backend/docs"
 )
 
@@ -35,6 +34,7 @@ func InitializeApp() (*App, error) {
 	homeHandler := handlers.NewHomeHandler(db)
 	tagHandler := handlers.NewTagHandler(db)
 	recommendHandler := handlers.NewRecommendHandler(db)
+	uploadHandler := handlers.NewUploadHandler(db)
 	app := &App{
 		DB:               db,
 		RecipeHandler:    recipeHandler,
@@ -44,6 +44,7 @@ func InitializeApp() (*App, error) {
 		HomeHandler:      homeHandler,
 		TagHandler:       tagHandler,
 		RecommendHandler: recommendHandler,
+		UploadHandler:    uploadHandler,
 	}
 	return app, nil
 }
@@ -51,7 +52,7 @@ func InitializeApp() (*App, error) {
 // wire.go:
 
 // ProviderSet 提供者集合
-var ProviderSet = wire.NewSet(database.Get, recipe.NewService, auth.NewService, favorite.NewService, history.NewService, tag.NewService, recommend.NewService, handlers.NewRecipeHandler, handlers.NewAuthHandler, handlers.NewFavoriteHandler, handlers.NewHistoryHandler, handlers.NewHomeHandler, handlers.NewTagHandler, handlers.NewRecommendHandler)
+var ProviderSet = wire.NewSet(database.Get, recipe.NewService, auth.NewService, favorite.NewService, history.NewService, tag.NewService, recommend.NewService, handlers.NewRecipeHandler, handlers.NewAuthHandler, handlers.NewFavoriteHandler, handlers.NewHistoryHandler, handlers.NewHomeHandler, handlers.NewTagHandler, handlers.NewRecommendHandler, handlers.NewUploadHandler)
 
 // App 应用依赖容器
 type App struct {
@@ -63,4 +64,5 @@ type App struct {
 	HomeHandler      *handlers.HomeHandler
 	TagHandler       *handlers.TagHandler
 	RecommendHandler *handlers.RecommendHandler
+	UploadHandler    *handlers.UploadHandler
 }
