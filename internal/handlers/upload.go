@@ -120,11 +120,11 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 	c.JSON(http.StatusOK, UploadImageResponse{URL: expectedURL})
 
 	// 异步上传到 OSS（使用 STS 凭证）
-	go h.uploadToOSSAsync(identity.GetOpenID(), objectKey, bytes.NewReader(fileData), expectedURL)
+	go h.uploadToOSSAsync(identity.GetOpenID(), objectKey, bytes.NewReader(fileData))
 }
 
 // uploadToOSSAsync 异步上传文件到 OSS（优先使用 STS 凭证，失败则回退到主账号凭证）
-func (h *UploadHandler) uploadToOSSAsync(openid, objectKey string, reader io.Reader, expectedURL string) {
+func (h *UploadHandler) uploadToOSSAsync(openid, objectKey string, reader io.Reader) {
 	logger.Infof("[Upload] 开始异步上传 - OpenID: %s, ObjectKey: %s", openid, objectKey)
 
 	// 尝试生成 STS 凭证（如果 STS 已配置）
