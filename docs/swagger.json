@@ -247,6 +247,43 @@
                 }
             }
         },
+        "/api/auth/stats": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "获取当前用户的收藏数和浏览历史数",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "获取用户统计数据",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.StatsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/auth/token": {
             "post": {
                 "description": "支持 authorization_code（微信登录）和 refresh_token 两种 grant_type",
@@ -1195,6 +1232,81 @@
                     }
                 }
             }
+        },
+        "/api/upload/image": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "upload"
+                ],
+                "summary": "上传图片到 OSS",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "完整的 OSS 对象键，如 avatars/user123.jpg（优先级高于 prefix）",
+                        "name": "object-key",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "文件路径前缀，如 avatars, images（当 object-key 为空时使用）",
+                        "name": "prefix",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "图片文件",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UploadImageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1775,6 +1887,19 @@
                 }
             }
         },
+        "handlers.StatsResponse": {
+            "type": "object",
+            "properties": {
+                "favorites": {
+                    "description": "收藏数",
+                    "type": "integer"
+                },
+                "history": {
+                    "description": "浏览历史数",
+                    "type": "integer"
+                }
+            }
+        },
         "handlers.StepRequest": {
             "type": "object",
             "required": [
@@ -1879,6 +2004,7 @@
             "type": "object",
             "properties": {
                 "avatar": {
+                    "description": "移除 url 验证，允许临时路径或 OSS URL",
                     "type": "string",
                     "maxLength": 512
                 },
@@ -1893,6 +2019,15 @@
                 "nickname": {
                     "type": "string",
                     "maxLength": 64
+                }
+            }
+        },
+        "handlers.UploadImageResponse": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "description": "上传后的图片 URL",
+                    "type": "string"
                 }
             }
         },
