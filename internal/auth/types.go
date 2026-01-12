@@ -41,6 +41,25 @@ type WxCode2SessionResponse struct {
 	ErrMsg     string `json:"errmsg,omitempty"`
 }
 
+// TtCode2SessionResponse 抖音 code2session 响应
+type TtCode2SessionResponse struct {
+	OpenID     string `json:"openid"`
+	SessionKey string `json:"session_key"`
+	UnionID    string `json:"unionid,omitempty"`
+	ErrCode    int    `json:"errcode,omitempty"`
+	ErrMsg     string `json:"errmsg,omitempty"`
+}
+
+// AlipayCode2SessionResponse 支付宝 code2session 响应
+type AlipayCode2SessionResponse struct {
+	OpenID     string `json:"openid"`
+	SessionKey string `json:"session_key"`
+	UnionID    string `json:"unionid,omitempty"`
+	ErrCode    string `json:"code,omitempty"`    // 支付宝使用 code 字段表示错误码
+	ErrMsg     string `json:"msg,omitempty"`     // 支付宝使用 msg 字段表示错误信息
+	SubMsg     string `json:"sub_msg,omitempty"` // 支付宝子错误信息
+}
+
 // IdP 常量
 const (
 	IDPWechatMP      = "wechat:mp"      // 微信小程序

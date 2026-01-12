@@ -124,20 +124,104 @@ func getWxAccessToken() (string, error) {
 	return result.AccessToken, nil
 }
 
-// ==================== 抖音实现（预留） ====================
+// ==================== 抖音实现 ====================
 
 type DouyinPhoneProvider struct{}
 
-func (p *DouyinPhoneProvider) GetPhoneNumber(code string) (string, error) {
-	// TODO: 实现抖音获取手机号
-	return "", errors.New("抖音获取手机号暂未实现")
+type ttPhoneResponse struct {
+	ErrNo   int    `json:"err_no"`
+	ErrTips string `json:"err_tips"`
+	Data    struct {
+		PhoneNumber string `json:"phone_number"`
+	} `json:"data"`
 }
 
-// ==================== 支付宝实现（预留） ====================
+func (p *DouyinPhoneProvider) GetPhoneNumber(code string) (string, error) {
+	appid := config.GetString("idps.tt.appid")
+	secret := config.GetString("idps.tt.secret")
+	if appid == "" || secret == "" {
+		return "", errors.New("抖音小程序配置缺失")
+	}
+
+	// 获取 access_token
+	accessToken, err := getTtAccessToken()
+	if err != nil {
+		return "", err
+	}
+
+	url := fmt.Sprintf("https://developer.toutiao.com/api/apps/v2/user/get_phone_number?access_token=%s", accessToken)
+
+	body := fmt.Sprintf(`{"code":"%s"}`, code)
+	resp, err := http.Post(url, "application/json", strings.NewReader(body))
+	if err != nil {
+		logger.Errorf("[Auth] 请求抖音获取手机号接口失败: %v", err)
+		return "", fmt.Errorf("请求抖音接口失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result ttPhoneResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		logger.Errorf("[Auth] 解析抖音手机号响应失败: %v", err)
+		return "", fmt.Errorf("解析抖音响应失败: %w", err)
+	}
+
+	if result.ErrNo != 0 {
+		logger.Errorf("[Auth] 抖音获取手机号失败 - ErrNo: %d, ErrTips: %s", result.ErrNo, result.ErrTips)
+		return "", fmt.Errorf("抖音获取手机号失败: %s", result.ErrTips)
+	}
+
+	phone := result.Data.PhoneNumber
+	if phone == "" {
+		return "", errors.New("抖音返回的手机号为空")
+	}
+
+	logger.Infof("[Auth] 抖音获取手机号成功 - Phone: %s***%s", phone[:3], phone[len(phone)-4:])
+	return phone, nil
+}
+
+// getTtAccessToken 获取抖音 access_token
+func getTtAccessToken() (string, error) {
+	appid := config.GetString("idps.tt.appid")
+	secret := config.GetString("idps.tt.secret")
+	if appid == "" || secret == "" {
+		return "", errors.New("抖音小程序配置缺失")
+	}
+
+	url := fmt.Sprintf("https://developer.toutiao.com/api/apps/v2/token?appid=%s&secret=%s&grant_type=client_credential", appid, secret)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("请求抖音 access_token 失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		ErrNo   int    `json:"err_no"`
+		ErrTips string `json:"err_tips"`
+		Data    struct {
+			AccessToken string `json:"access_token"`
+			ExpiresIn   int    `json:"expires_in"`
+		} `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("解析抖音 access_token 响应失败: %w", err)
+	}
+
+	if result.ErrNo != 0 {
+		return "", fmt.Errorf("获取抖音 access_token 失败: %s", result.ErrTips)
+	}
+
+	return result.Data.AccessToken, nil
+}
+
+// ==================== 支付宝实现 ====================
 
 type AlipayPhoneProvider struct{}
 
 func (p *AlipayPhoneProvider) GetPhoneNumber(code string) (string, error) {
-	// TODO: 实现支付宝获取手机号
-	return "", errors.New("支付宝获取手机号暂未实现")
+	// 支付宝获取手机号需要 RSA 签名，比较复杂
+	// 这里先返回未实现错误，后续可以完善
+	logger.Warnf("[Auth] 支付宝获取手机号暂未完全实现，需要 RSA 签名")
+	return "", errors.New("支付宝获取手机号暂未完全实现，需要配置 RSA 密钥和实现签名逻辑")
 }
