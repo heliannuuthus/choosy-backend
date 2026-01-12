@@ -88,15 +88,14 @@ func main() {
 	api := r.Group("/api")
 	{
 		// 认证路由（OAuth2.1 风格）
-		auth := api.Group("/auth")
-		{
-			auth.POST("/token", app.AuthHandler.Token)   // 获取/刷新 token
-			auth.POST("/revoke", app.AuthHandler.Revoke) // 撤销 token
-			auth.POST("/revoke-all", middleware.RequireAuth(), app.AuthHandler.LogoutAll)
-			auth.GET("/profile", middleware.RequireAuth(), app.AuthHandler.Profile)
-			auth.PUT("/profile", middleware.RequireAuth(), app.AuthHandler.UpdateProfile)
-			auth.GET("/stats", middleware.RequireAuth(), app.AuthHandler.GetStats) // 获取统计数据
-		}
+		api.POST("/token", app.AuthHandler.Token)   // 获取/刷新 token
+		api.POST("/revoke", app.AuthHandler.Revoke) // 撤销 token
+		api.POST("/revoke-all", middleware.RequireAuth(), app.AuthHandler.LogoutAll)
+		api.GET("/stats", middleware.RequireAuth(), app.AuthHandler.GetStats) // 获取统计数据
+
+		// 用户信息路由
+		api.GET("/profile", middleware.RequireAuth(), app.AuthHandler.Profile)
+		api.PUT("/profile", middleware.RequireAuth(), app.AuthHandler.UpdateProfile)
 
 		// 菜谱路由
 		recipes := api.Group("/recipes")

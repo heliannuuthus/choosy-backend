@@ -29,13 +29,6 @@ definitions:
           type: string
         type: array
     type: object
-  handlers.BindPhoneRequest:
-    properties:
-      code:
-        type: string
-    required:
-    - code
-    type: object
   handlers.CategoryResponse:
     properties:
       key:
@@ -468,6 +461,9 @@ definitions:
       nickname:
         maxLength: 64
         type: string
+      phone_code:
+        description: 小程序授权码，用于绑定手机号；传空字符串表示解绑，不传则不处理
+        type: string
     type: object
   handlers.UploadImageResponse:
     properties:
@@ -506,223 +502,6 @@ info:
   title: Choosy API
   version: "1.0"
 paths:
-  /api/auth/bindPhone:
-    post:
-      consumes:
-      - application/json
-      description: 通过小程序授权码绑定手机号，支持微信/抖音/支付宝小程序
-      parameters:
-      - description: 绑定请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.BindPhoneRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.OAuth2Error'
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "409":
-          description: 手机号已被其他账号绑定
-          schema:
-            $ref: '#/definitions/handlers.OAuth2Error'
-      security:
-      - Bearer: []
-      summary: 绑定手机号
-      tags:
-      - auth
-  /api/auth/logout-all:
-    post:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - Bearer: []
-      summary: 登出所有设备
-      tags:
-      - auth
-  /api/auth/profile:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.UserProfile'
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - Bearer: []
-      summary: 获取当前用户信息
-      tags:
-      - auth
-    put:
-      consumes:
-      - application/json
-      parameters:
-      - description: 更新请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.UpdateProfileRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.UserProfile'
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - Bearer: []
-      summary: 更新当前用户信息
-      tags:
-      - auth
-  /api/auth/revoke:
-    post:
-      consumes:
-      - application/x-www-form-urlencoded
-      parameters:
-      - description: 要撤销的 refresh_token
-        in: formData
-        name: token
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.OAuth2Error'
-      summary: 撤销 token
-      tags:
-      - auth
-  /api/auth/stats:
-    get:
-      consumes:
-      - application/json
-      description: 获取当前用户的收藏数和浏览历史数
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.StatsResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - Bearer: []
-      summary: 获取用户统计数据
-      tags:
-      - auth
-  /api/auth/token:
-    post:
-      consumes:
-      - application/x-www-form-urlencoded
-      description: 支持 authorization_code（微信登录）和 refresh_token 两种 grant_type
-      parameters:
-      - description: 授权类型
-        enum:
-        - authorization_code
-        - refresh_token
-        in: formData
-        name: grant_type
-        required: true
-        type: string
-      - description: 微信登录 code（grant_type=authorization_code 时必填）
-        in: formData
-        name: code
-        type: string
-      - description: 刷新令牌（grant_type=refresh_token 时必填）
-        in: formData
-        name: refresh_token
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.TokenResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.OAuth2Error'
-        "412":
-          description: refresh_token 无效或已过期
-          schema:
-            $ref: '#/definitions/handlers.OAuth2Error'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.OAuth2Error'
-      summary: 获取/刷新 token
-      tags:
-      - auth
   /api/context:
     post:
       consumes:
@@ -1049,6 +828,72 @@ paths:
       summary: 获取推荐菜谱（随机）
       tags:
       - home
+  /api/profile:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.UserProfile'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: 获取当前用户信息
+      tags:
+      - auth
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 更新请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.UserProfile'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: 更新当前用户信息
+      tags:
+      - auth
   /api/recipes:
     get:
       parameters:
@@ -1254,6 +1099,77 @@ paths:
       summary: 获取智能推荐菜谱
       tags:
       - recommend
+  /api/revoke:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      parameters:
+      - description: 要撤销的 refresh_token
+        in: formData
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.OAuth2Error'
+      summary: 撤销 token
+      tags:
+      - auth
+  /api/revoke-all:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: 登出所有设备
+      tags:
+      - auth
+  /api/stats:
+    get:
+      consumes:
+      - application/json
+      description: 获取当前用户的收藏数和浏览历史数
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.StatsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: 获取用户统计数据
+      tags:
+      - auth
   /api/tags/cuisines:
     get:
       produces:
@@ -1296,6 +1212,50 @@ paths:
       summary: 获取所有场景
       tags:
       - tags
+  /api/token:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: 支持 authorization_code（微信登录）和 refresh_token 两种 grant_type
+      parameters:
+      - description: 授权类型
+        enum:
+        - authorization_code
+        - refresh_token
+        in: formData
+        name: grant_type
+        required: true
+        type: string
+      - description: 微信登录 code（grant_type=authorization_code 时必填）
+        in: formData
+        name: code
+        type: string
+      - description: 刷新令牌（grant_type=refresh_token 时必填）
+        in: formData
+        name: refresh_token
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.TokenResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.OAuth2Error'
+        "412":
+          description: refresh_token 无效或已过期
+          schema:
+            $ref: '#/definitions/handlers.OAuth2Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.OAuth2Error'
+      summary: 获取/刷新 token
+      tags:
+      - auth
   /api/upload/image:
     post:
       consumes:
