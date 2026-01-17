@@ -92,7 +92,7 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 		if prefix == "" {
 			prefix = "images"
 		}
-		
+
 		// 如果是头像上传（prefix 为 "avatars"），强制使用认证用户的 openid 生成固定路径
 		// 这样可以防止前端传入错误的 openid 导致安全风险
 		if prefix == "avatars" {

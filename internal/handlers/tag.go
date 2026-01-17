@@ -133,10 +133,10 @@ func (h *TagHandler) GetTagsByType(c *gin.Context) {
 
 // CreateTagRequest 创建标签请求（后台管理）
 type CreateTagRequest struct {
-	Type     string `json:"type" binding:"required"`      // 标签类型
-	Value    string `json:"value" binding:"required"`      // 标签值
-	Label    string `json:"label" binding:"required"`     // 显示名称
-	RecipeID string `json:"recipe_id,omitempty"`          // 菜谱ID（可选，为空时创建选项）
+	Type     string `json:"type" binding:"required"`  // 标签类型
+	Value    string `json:"value" binding:"required"` // 标签值
+	Label    string `json:"label" binding:"required"` // 显示名称
+	RecipeID string `json:"recipe_id,omitempty"`      // 菜谱ID（可选，为空时创建选项）
 }
 
 // CreateTag 创建标签（后台管理）
@@ -157,7 +157,7 @@ func (h *TagHandler) CreateTag(c *gin.Context) {
 	}
 
 	tagType := models.TagType(req.Type)
-	
+
 	// 验证类型
 	if !h.isValidTagType(tagType, false) && !h.isValidTagType(tagType, true) {
 		c.JSON(http.StatusBadRequest, gin.H{"detail": "无效的标签类型"})
@@ -302,7 +302,7 @@ func (h *TagHandler) isValidTagType(tagType models.TagType, isOption bool) bool 
 		models.TagTypeTaboo,
 		models.TagTypeAllergy,
 	}
-	
+
 	for _, t := range allTypes {
 		if tagType == t {
 			if isOption {

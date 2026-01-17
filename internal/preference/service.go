@@ -4,20 +4,21 @@ import (
 	"choosy-backend/internal/models"
 	"choosy-backend/internal/tag"
 
-	"gorm.io/gorm"
 	"sync"
+
+	"gorm.io/gorm"
 )
 
 // Service 用户偏好服务
 type Service struct {
-	db        *gorm.DB
+	db         *gorm.DB
 	tagService *tag.Service
 }
 
 // NewService 创建用户偏好服务
 func NewService(db *gorm.DB) *Service {
 	return &Service{
-		db:        db,
+		db:         db,
 		tagService: tag.NewService(db),
 	}
 }

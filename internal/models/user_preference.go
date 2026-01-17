@@ -26,7 +26,7 @@ type UserPreferenceResponse struct {
 
 // UserPreferencesByType 按类型分组的用户偏好
 type UserPreferencesByType struct {
-	Flavors  []UserPreferenceResponse `json:"flavors"`  // 口味偏好
-	Taboos   []UserPreferenceResponse `json:"taboos"`   // 忌口偏好
+	Flavors   []UserPreferenceResponse `json:"flavors"`   // 口味偏好
+	Taboos    []UserPreferenceResponse `json:"taboos"`    // 忌口偏好
 	Allergies []UserPreferenceResponse `json:"allergies"` // 过敏偏好
 }

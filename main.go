@@ -137,7 +137,7 @@ func main() {
 			preference := user.Group("/preference")
 			{
 				preference.GET("", middleware.RequireAuth(), app.PreferenceHandler.GetUserPreferences)    // 获取用户偏好（需登录）
-				preference.PUT("", middleware.RequireAuth(), app.PreferenceHandler.UpdateUserPreferences)  // 更新用户偏好（需登录）
+				preference.PUT("", middleware.RequireAuth(), app.PreferenceHandler.UpdateUserPreferences) // 更新用户偏好（需登录）
 			}
 		}
 
@@ -159,23 +159,23 @@ func main() {
 			// GET /api/tags?type=taboo - 获取特定类型的选项
 			// GET /api/tags?type=flavor&recipe_id=xxx - 获取特定菜谱的标签
 			tags.GET("", app.TagHandler.ListTags)
-			
+
 			// GET /api/tags/{type} - 获取特定类型的标签/选项
 			// 支持所有类型：cuisine/flavor/scene/taboo/allergy
 			tags.GET("/:type", app.TagHandler.GetTagsByType)
-			
+
 			// POST /api/tags - 创建标签/选项（后台管理）
 			// recipe_id 为空时创建选项，不为空时创建菜谱标签
 			tags.POST("", middleware.RequireAuth(), app.TagHandler.CreateTag)
-			
+
 			// PUT /api/tags/{type}/{value} - 更新标签/选项（后台管理）
 			// recipe_id 查询参数为空时更新选项，不为空时更新菜谱标签
 			tags.PUT("/:type/:value", middleware.RequireAuth(), app.TagHandler.UpdateTag)
-			
+
 			// DELETE /api/tags/{type}/{value} - 删除标签/选项（后台管理）
 			// recipe_id 查询参数为空时删除选项，不为空时删除菜谱标签
 			tags.DELETE("/:type/:value", middleware.RequireAuth(), app.TagHandler.DeleteTag)
-			
+
 			// 向后兼容的旧接口
 			tags.GET("/cuisines", app.TagHandler.GetCuisines)
 			tags.GET("/flavors", app.TagHandler.GetFlavors)

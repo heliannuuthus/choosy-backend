@@ -12,7 +12,7 @@ import (
 
 const (
 	// 缓存配置
-	tagCacheSize        = 1000            // 缓存大小（标签数量通常 < 500）
+	tagCacheSize        = 1000           // 缓存大小（标签数量通常 < 500）
 	tagCacheNumCounters = 10000          // 计数器数量（用于统计）
 	tagCacheBufferItems = 64             // 缓冲区大小
 	tagCacheTTL         = 24 * time.Hour // TTL：24小时

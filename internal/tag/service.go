@@ -9,7 +9,6 @@ import (
 	"gorm.io/gorm"
 )
 
-
 // Service 标签服务
 type Service struct {
 	db *gorm.DB
@@ -44,7 +43,7 @@ func (s *Service) GetTagsByType(tagType models.TagType) ([]models.Tag, error) {
 	if tagPtrs == nil {
 		return []models.Tag{}, nil
 	}
-	
+
 	tags := make([]models.Tag, len(tagPtrs))
 	for i, tagPtr := range tagPtrs {
 		tags[i] = *tagPtr
@@ -59,7 +58,7 @@ func (s *Service) GetAllTags() (map[models.TagType][]models.Tag, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	result := make(map[models.TagType][]models.Tag)
 	for tagType, tagPtrs := range tagPtrsMap {
 		tags := make([]models.Tag, len(tagPtrs))
@@ -74,12 +73,12 @@ func (s *Service) GetAllTags() (map[models.TagType][]models.Tag, error) {
 // CreateTag 创建标签定义（如果不存在）
 func (s *Service) CreateTag(value string, label string, tagType models.TagType) (*models.Tag, error) {
 	cache := getTagCache()
-	
+
 	// 先检查缓存（懒加载）
 	if tag, err := cache.Get(tagType, value, s.db); err == nil {
 		return tag, nil // 已存在，直接返回
 	}
-	
+
 	// 检查数据库
 	var existing models.Tag
 	err := s.db.Where("type = ? AND value = ?", tagType, value).First(&existing).Error
@@ -101,7 +100,7 @@ func (s *Service) CreateTag(value string, label string, tagType models.TagType) 
 	if err := s.db.Create(&tag).Error; err != nil {
 		return nil, err
 	}
-	
+
 	// 设置缓存
 	cache.Set(&tag)
 	return &tag, nil
@@ -110,16 +109,16 @@ func (s *Service) CreateTag(value string, label string, tagType models.TagType) 
 // UpdateTag 更新标签定义（延迟双删策略）
 func (s *Service) UpdateTag(value string, label string, tagType models.TagType) error {
 	cache := getTagCache()
-	
+
 	// 延迟双删策略：第一次删除缓存
 	cache.Delete(tagType, value)
-	
+
 	// 更新数据库
 	var tag models.Tag
 	if err := s.db.Where("type = ? AND value = ?", tagType, value).First(&tag).Error; err != nil {
 		return fmt.Errorf("标签不存在: %s", value)
 	}
-	
+
 	result := s.db.Model(&tag).Update("label", label)
 	if result.Error != nil {
 		return result.Error
@@ -127,20 +126,20 @@ func (s *Service) UpdateTag(value string, label string, tagType models.TagType) 
 	if result.RowsAffected == 0 {
 		return fmt.Errorf("标签不存在: %s", value)
 	}
-	
+
 	// 延迟双删策略：延迟后再次删除缓存（保证最终一致性）
 	cache.DeleteWithDelay(tagType, value, tagDeleteDelay)
-	
+
 	return nil
 }
 
 // DeleteTag 删除标签定义（延迟双删策略）
 func (s *Service) DeleteTag(value string, tagType models.TagType) error {
 	cache := getTagCache()
-	
+
 	// 延迟双删策略：第一次删除缓存
 	cache.Delete(tagType, value)
-	
+
 	// 检查是否有菜谱关联
 	var count int64
 	s.db.Model(&models.RecipeTag{}).
@@ -160,10 +159,10 @@ func (s *Service) DeleteTag(value string, tagType models.TagType) error {
 	if result.RowsAffected == 0 {
 		return fmt.Errorf("标签不存在: %s", value)
 	}
-	
+
 	// 延迟双删策略：延迟后再次删除缓存（保证最终一致性）
 	cache.DeleteWithDelay(tagType, value, tagDeleteDelay)
-	
+
 	return nil
 }
 
