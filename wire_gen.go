@@ -16,10 +16,11 @@ import (
 	"choosy-backend/internal/recipe"
 	"choosy-backend/internal/recommend"
 	"choosy-backend/internal/tag"
-
 	"github.com/google/wire"
 	"gorm.io/gorm"
+)
 
+import (
 	_ "choosy-backend/docs"
 )
 
