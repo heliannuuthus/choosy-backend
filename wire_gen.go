@@ -12,6 +12,7 @@ import (
 	"choosy-backend/internal/favorite"
 	"choosy-backend/internal/handlers"
 	"choosy-backend/internal/history"
+	"choosy-backend/internal/preference"
 	"choosy-backend/internal/recipe"
 	"choosy-backend/internal/recommend"
 	"choosy-backend/internal/tag"
@@ -36,16 +37,18 @@ func InitializeApp() (*App, error) {
 	tagHandler := handlers.NewTagHandler(db)
 	recommendHandler := handlers.NewRecommendHandler(db)
 	uploadHandler := handlers.NewUploadHandler(db)
+	preferenceHandler := handlers.NewPreferenceHandler(db)
 	app := &App{
-		DB:               db,
-		RecipeHandler:    recipeHandler,
-		AuthHandler:      authHandler,
-		FavoriteHandler:  favoriteHandler,
-		HistoryHandler:   historyHandler,
-		HomeHandler:      homeHandler,
-		TagHandler:       tagHandler,
-		RecommendHandler: recommendHandler,
-		UploadHandler:    uploadHandler,
+		DB:                db,
+		RecipeHandler:     recipeHandler,
+		AuthHandler:       authHandler,
+		FavoriteHandler:   favoriteHandler,
+		HistoryHandler:    historyHandler,
+		HomeHandler:       homeHandler,
+		TagHandler:        tagHandler,
+		RecommendHandler:  recommendHandler,
+		UploadHandler:     uploadHandler,
+		PreferenceHandler: preferenceHandler,
 	}
 	return app, nil
 }
@@ -53,17 +56,18 @@ func InitializeApp() (*App, error) {
 // wire.go:
 
 // ProviderSet 提供者集合
-var ProviderSet = wire.NewSet(database.Get, recipe.NewService, auth.NewService, favorite.NewService, history.NewService, tag.NewService, recommend.NewService, handlers.NewRecipeHandler, handlers.NewAuthHandler, handlers.NewFavoriteHandler, handlers.NewHistoryHandler, handlers.NewHomeHandler, handlers.NewTagHandler, handlers.NewRecommendHandler, handlers.NewUploadHandler)
+var ProviderSet = wire.NewSet(database.Get, recipe.NewService, auth.NewService, favorite.NewService, history.NewService, preference.NewService, tag.NewService, recommend.NewService, handlers.NewRecipeHandler, handlers.NewAuthHandler, handlers.NewFavoriteHandler, handlers.NewHistoryHandler, handlers.NewHomeHandler, handlers.NewTagHandler, handlers.NewRecommendHandler, handlers.NewUploadHandler, handlers.NewPreferenceHandler)
 
 // App 应用依赖容器
 type App struct {
-	DB               *gorm.DB
-	RecipeHandler    *handlers.RecipeHandler
-	AuthHandler      *handlers.AuthHandler
-	FavoriteHandler  *handlers.FavoriteHandler
-	HistoryHandler   *handlers.HistoryHandler
-	HomeHandler      *handlers.HomeHandler
-	TagHandler       *handlers.TagHandler
-	RecommendHandler *handlers.RecommendHandler
-	UploadHandler    *handlers.UploadHandler
+	DB                *gorm.DB
+	RecipeHandler     *handlers.RecipeHandler
+	AuthHandler       *handlers.AuthHandler
+	FavoriteHandler   *handlers.FavoriteHandler
+	HistoryHandler    *handlers.HistoryHandler
+	HomeHandler       *handlers.HomeHandler
+	TagHandler        *handlers.TagHandler
+	RecommendHandler  *handlers.RecommendHandler
+	UploadHandler     *handlers.UploadHandler
+	PreferenceHandler *handlers.PreferenceHandler
 }

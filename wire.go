@@ -9,6 +9,7 @@ import (
 	"choosy-backend/internal/favorite"
 	"choosy-backend/internal/handlers"
 	"choosy-backend/internal/history"
+	"choosy-backend/internal/preference"
 	"choosy-backend/internal/recipe"
 	"choosy-backend/internal/recommend"
 	"choosy-backend/internal/tag"
@@ -24,6 +25,7 @@ var ProviderSet = wire.NewSet(
 	auth.NewService,
 	favorite.NewService,
 	history.NewService,
+	preference.NewService,
 	tag.NewService,
 	recommend.NewService,
 	handlers.NewRecipeHandler,
@@ -34,19 +36,21 @@ var ProviderSet = wire.NewSet(
 	handlers.NewTagHandler,
 	handlers.NewRecommendHandler,
 	handlers.NewUploadHandler,
+	handlers.NewPreferenceHandler,
 )
 
 // App 应用依赖容器
 type App struct {
-	DB               *gorm.DB
-	RecipeHandler    *handlers.RecipeHandler
-	AuthHandler      *handlers.AuthHandler
-	FavoriteHandler  *handlers.FavoriteHandler
-	HistoryHandler   *handlers.HistoryHandler
-	HomeHandler      *handlers.HomeHandler
-	TagHandler       *handlers.TagHandler
-	RecommendHandler *handlers.RecommendHandler
-	UploadHandler    *handlers.UploadHandler
+	DB                *gorm.DB
+	RecipeHandler     *handlers.RecipeHandler
+	AuthHandler       *handlers.AuthHandler
+	FavoriteHandler   *handlers.FavoriteHandler
+	HistoryHandler    *handlers.HistoryHandler
+	HomeHandler       *handlers.HomeHandler
+	TagHandler        *handlers.TagHandler
+	RecommendHandler  *handlers.RecommendHandler
+	UploadHandler     *handlers.UploadHandler
+	PreferenceHandler *handlers.PreferenceHandler
 }
 
 // InitializeApp 初始化应用（由 wire 生成）

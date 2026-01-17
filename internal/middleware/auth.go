@@ -26,7 +26,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		identity, err := auth.VerifyAccessToken(token)
 		if err == nil && identity != nil {
-			logger.Infof("[Auth] 可选认证成功 - OpenID: %s, Path: %s", identity.OpenID, c.Request.URL.Path)
+			logger.Infof("[Auth] 可选认证成功 - Path: %s, OpenID: %s", c.Request.URL.Path, identity.OpenID)
 			c.Set("user", identity)
 		}
 
@@ -39,7 +39,7 @@ func RequireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authorization := c.GetHeader("Authorization")
 		if authorization == "" {
-			logger.Warnf("[Auth] 请求未携带 Authorization 头 - Path: %s, IP: %s", c.Request.URL.Path, c.ClientIP())
+			logger.Debugf("[Auth] 请求未携带 Authorization 头 - Path: %s, IP: %s", c.Request.URL.Path, c.ClientIP())
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"detail": "未登录或登录已过期"})
 			return
 		}
@@ -60,7 +60,7 @@ func RequireAuth() gin.HandlerFunc {
 			return
 		}
 
-		logger.Infof("[Auth] 认证成功 - OpenID: %s, Path: %s", identity.OpenID, c.Request.URL.Path)
+		logger.Infof("[Auth] 认证成功 - Path: %s, OpenID: %s", c.Request.URL.Path, identity.OpenID)
 		c.Set("user", identity)
 		c.Next()
 	}

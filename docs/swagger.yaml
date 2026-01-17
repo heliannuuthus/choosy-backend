@@ -62,6 +62,25 @@ definitions:
       weather:
         $ref: '#/definitions/handlers.WeatherInfo'
     type: object
+  handlers.CreateTagRequest:
+    properties:
+      label:
+        description: 显示名称
+        type: string
+      recipe_id:
+        description: 菜谱ID（可选，为空时创建选项）
+        type: string
+      type:
+        description: 标签类型
+        type: string
+      value:
+        description: 标签值
+        type: string
+    required:
+    - label
+    - type
+    - value
+    type: object
   handlers.FavoriteListItem:
     properties:
       created_at:
@@ -465,6 +484,13 @@ definitions:
         description: 小程序授权码，用于绑定手机号；传空字符串表示解绑，不传则不处理
         type: string
     type: object
+  handlers.UpdateTagRequest:
+    properties:
+      label:
+        type: string
+    required:
+    - label
+    type: object
   handlers.UploadImageResponse:
     properties:
       url:
@@ -494,6 +520,81 @@ definitions:
         type: number
       weather:
         type: string
+    type: object
+  preference.OptionItem:
+    properties:
+      label:
+        description: 显示名称
+        type: string
+      value:
+        description: 标签值
+        type: string
+    type: object
+  preference.OptionItemWithSelected:
+    properties:
+      label:
+        description: 显示名称
+        type: string
+      selected:
+        description: 是否已选择
+        type: boolean
+      value:
+        description: 标签值
+        type: string
+    type: object
+  preference.OptionsResponse:
+    properties:
+      allergies:
+        description: 过敏选项
+        items:
+          $ref: '#/definitions/preference.OptionItem'
+        type: array
+      flavors:
+        description: 口味选项
+        items:
+          $ref: '#/definitions/preference.OptionItem'
+        type: array
+      taboos:
+        description: 忌口选项
+        items:
+          $ref: '#/definitions/preference.OptionItem'
+        type: array
+    type: object
+  preference.UpdatePreferencesRequest:
+    properties:
+      allergies:
+        description: 过敏选项值列表
+        items:
+          type: string
+        type: array
+      flavors:
+        description: 口味选项值列表
+        items:
+          type: string
+        type: array
+      taboos:
+        description: 忌口选项值列表
+        items:
+          type: string
+        type: array
+    type: object
+  preference.UserPreferencesResponse:
+    properties:
+      allergies:
+        description: 过敏偏好
+        items:
+          $ref: '#/definitions/preference.OptionItemWithSelected'
+        type: array
+      flavors:
+        description: 口味偏好
+        items:
+          $ref: '#/definitions/preference.OptionItemWithSelected'
+        type: array
+      taboos:
+        description: 忌口偏好
+        items:
+          $ref: '#/definitions/preference.OptionItemWithSelected'
+        type: array
     type: object
 host: localhost:18000
 info:
@@ -532,248 +633,6 @@ paths:
       summary: 获取推荐上下文
       tags:
       - context
-  /api/favorites:
-    get:
-      parameters:
-      - description: 分类筛选
-        in: query
-        name: category
-        type: string
-      - description: 搜索关键词
-        in: query
-        name: search
-        type: string
-      - default: 20
-        description: 限制数量
-        in: query
-        name: limit
-        type: integer
-      - default: 0
-        description: 偏移量
-        in: query
-        name: offset
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.FavoriteListResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: 获取收藏列表
-      tags:
-      - favorites
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: 收藏信息
-        in: body
-        name: favorite
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.FavoriteRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.FavoriteResponse'
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: 添加收藏
-      tags:
-      - favorites
-  /api/favorites/{recipe_id}:
-    delete:
-      parameters:
-      - description: 菜谱ID
-        in: path
-        name: recipe_id
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: 取消收藏
-      tags:
-      - favorites
-  /api/favorites/{recipe_id}/check:
-    get:
-      parameters:
-      - description: 菜谱ID
-        in: path
-        name: recipe_id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.CheckFavoriteResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: 检查是否已收藏
-      tags:
-      - favorites
-  /api/favorites/batch-check:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: 菜谱ID列表
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.BatchCheckRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.BatchCheckResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: 批量检查收藏状态
-      tags:
-      - favorites
-  /api/history:
-    delete:
-      responses:
-        "204":
-          description: No Content
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: 清空浏览历史
-      tags:
-      - history
-    get:
-      parameters:
-      - description: 分类筛选
-        in: query
-        name: category
-        type: string
-      - description: 搜索关键词
-        in: query
-        name: search
-        type: string
-      - default: 20
-        description: 限制数量
-        in: query
-        name: limit
-        type: integer
-      - default: 0
-        description: 偏移量
-        in: query
-        name: offset
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.HistoryListResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: 获取浏览历史列表
-      tags:
-      - history
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: 浏览记录信息
-        in: body
-        name: history
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.HistoryRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.HistoryResponse'
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: 添加浏览记录
-      tags:
-      - history
-  /api/history/{recipe_id}:
-    delete:
-      parameters:
-      - description: 菜谱ID
-        in: path
-        name: recipe_id
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: 删除浏览记录
-      tags:
-      - history
   /api/home/banners:
     get:
       produces:
@@ -828,72 +687,25 @@ paths:
       summary: 获取推荐菜谱（随机）
       tags:
       - home
-  /api/profile:
+  /api/preferences:
     get:
+      description: 获取口味、忌口、过敏的所有可选选项（从缓存索引获取，性能最优）
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.UserProfile'
-        "401":
-          description: Unauthorized
+            $ref: '#/definitions/preference.OptionsResponse'
+        "500":
+          description: Internal Server Error
           schema:
             additionalProperties:
               type: string
             type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - Bearer: []
-      summary: 获取当前用户信息
+      summary: 获取所有偏好选项
       tags:
-      - auth
-    put:
-      consumes:
-      - application/json
-      parameters:
-      - description: 更新请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.UpdateProfileRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.UserProfile'
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - Bearer: []
-      summary: 更新当前用户信息
-      tags:
-      - auth
+      - preference
   /api/recipes:
     get:
       parameters:
@@ -1170,8 +982,152 @@ paths:
       summary: 获取用户统计数据
       tags:
       - auth
+  /api/tags:
+    get:
+      description: 获取标签列表，支持通过查询参数过滤。所有类型（cuisine/flavor/scene/taboo/allergy）都统一使用此接口
+      parameters:
+      - description: '标签类型: cuisine/flavor/scene/taboo/allergy'
+        in: query
+        name: type
+        type: string
+      - description: 菜谱ID（获取特定菜谱的标签，仅用于 cuisine/flavor/scene）
+        in: query
+        name: recipe_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.TagValueResponse'
+            type: array
+      summary: 获取标签列表
+      tags:
+      - tags
+    post:
+      consumes:
+      - application/json
+      description: 创建标签或选项。如果 recipe_id 为空，创建选项（仅支持 taboo/allergy）；如果 recipe_id 不为空，创建菜谱标签
+      parameters:
+      - description: 标签信息
+        in: body
+        name: tag
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateTagRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.TagValueResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 创建标签
+      tags:
+      - tags
+  /api/tags/{type}:
+    get:
+      description: 支持所有类型：cuisine/flavor/scene/taboo/allergy
+      parameters:
+      - description: '标签类型: cuisine/flavor/scene/taboo/allergy'
+        in: path
+        name: type
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.TagValueResponse'
+            type: array
+      summary: 根据类型获取标签
+      tags:
+      - tags
+  /api/tags/{type}/{value}:
+    delete:
+      description: 删除标签或选项
+      parameters:
+      - description: 标签类型
+        in: path
+        name: type
+        required: true
+        type: string
+      - description: 标签值
+        in: path
+        name: value
+        required: true
+        type: string
+      - description: 菜谱ID（删除菜谱标签时必填，删除选项时留空）
+        in: query
+        name: recipe_id
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 删除标签
+      tags:
+      - tags
+    put:
+      consumes:
+      - application/json
+      description: 更新标签或选项的显示名称
+      parameters:
+      - description: 标签类型
+        in: path
+        name: type
+        required: true
+        type: string
+      - description: 标签值
+        in: path
+        name: value
+        required: true
+        type: string
+      - description: 菜谱ID（更新菜谱标签时必填，更新选项时留空）
+        in: query
+        name: recipe_id
+        type: string
+      - description: 更新内容
+        in: body
+        name: tag
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateTagRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.TagValueResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 更新标签
+      tags:
+      - tags
   /api/tags/cuisines:
     get:
+      deprecated: true
       produces:
       - application/json
       responses:
@@ -1186,6 +1142,7 @@ paths:
       - tags
   /api/tags/flavors:
     get:
+      deprecated: true
       produces:
       - application/json
       responses:
@@ -1200,6 +1157,7 @@ paths:
       - tags
   /api/tags/scenes:
     get:
+      deprecated: true
       produces:
       - application/json
       responses:
@@ -1304,6 +1262,384 @@ paths:
       summary: 上传图片到 OSS
       tags:
       - upload
+  /api/user/favorites:
+    get:
+      parameters:
+      - description: 分类筛选
+        in: query
+        name: category
+        type: string
+      - description: 搜索关键词
+        in: query
+        name: search
+        type: string
+      - default: 20
+        description: 限制数量
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: 偏移量
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.FavoriteListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 获取收藏列表
+      tags:
+      - favorites
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 收藏信息
+        in: body
+        name: favorite
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.FavoriteRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.FavoriteResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 添加收藏
+      tags:
+      - favorites
+  /api/user/favorites/{recipe_id}:
+    delete:
+      parameters:
+      - description: 菜谱ID
+        in: path
+        name: recipe_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 取消收藏
+      tags:
+      - favorites
+  /api/user/favorites/{recipe_id}/check:
+    get:
+      parameters:
+      - description: 菜谱ID
+        in: path
+        name: recipe_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.CheckFavoriteResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 检查是否已收藏
+      tags:
+      - favorites
+  /api/user/favorites/batch-check:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 菜谱ID列表
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.BatchCheckRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.BatchCheckResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 批量检查收藏状态
+      tags:
+      - favorites
+  /api/user/history:
+    delete:
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 清空浏览历史
+      tags:
+      - history
+    get:
+      parameters:
+      - description: 分类筛选
+        in: query
+        name: category
+        type: string
+      - description: 搜索关键词
+        in: query
+        name: search
+        type: string
+      - default: 20
+        description: 限制数量
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: 偏移量
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.HistoryListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 获取浏览历史列表
+      tags:
+      - history
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 浏览记录信息
+        in: body
+        name: history
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.HistoryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.HistoryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 添加浏览记录
+      tags:
+      - history
+  /api/user/history/{recipe_id}:
+    delete:
+      parameters:
+      - description: 菜谱ID
+        in: path
+        name: recipe_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 删除浏览记录
+      tags:
+      - history
+  /api/user/preference:
+    get:
+      description: 获取当前用户的偏好设置（包含选中状态）
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/preference.UserPreferencesResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 获取用户偏好
+      tags:
+      - preference
+    put:
+      consumes:
+      - application/json
+      description: 更新当前用户的偏好设置（全量替换）
+      parameters:
+      - description: 偏好设置
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/preference.UpdatePreferencesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 更新用户偏好
+      tags:
+      - preference
+  /api/user/profile:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.UserProfile'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: 获取当前用户信息
+      tags:
+      - auth
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 更新请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.UserProfile'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: 更新当前用户信息
+      tags:
+      - auth
 securityDefinitions:
   Bearer:
     description: 输入 "Bearer {token}"

@@ -48,6 +48,20 @@ CREATE TABLE IF NOT EXISTS t_refresh_token (
 CREATE INDEX IF NOT EXISTS idx_t_refresh_token_openid ON t_refresh_token(openid);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_t_refresh_token_token ON t_refresh_token(token);
 
+-- 用户偏好表（存储用户选择的偏好选项）
+CREATE TABLE IF NOT EXISTS t_user_preference (
+    _id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    openid      VARCHAR(64) NOT NULL,           -- 关联 t_user.openid
+    tag_value   VARCHAR(50) NOT NULL,          -- 关联 t_tag.value
+    tag_type    VARCHAR(20) NOT NULL,          -- 关联 t_tag.type（冗余字段，优化查询）
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(openid, tag_value, tag_type)        -- 防止重复选择
+);
+CREATE INDEX IF NOT EXISTS idx_t_user_preference_openid ON t_user_preference(openid);
+CREATE INDEX IF NOT EXISTS idx_t_user_preference_tag_type ON t_user_preference(tag_type);
+CREATE INDEX IF NOT EXISTS idx_t_user_preference_openid_type ON t_user_preference(openid, tag_type);
+
 -- ==================== 菜谱相关 ====================
 
 -- 菜谱主表
@@ -109,19 +123,35 @@ CREATE INDEX IF NOT EXISTS idx_t_additional_note_recipe_id ON t_additional_note(
 
 -- ==================== 标签相关 ====================
 
--- 标签表（直接关联菜谱）
+-- 标签表（独立存储，不关联菜谱）
+-- 存储所有标签定义，包括菜谱标签（cuisine/flavor/scene）和用户偏好选项（taboo/allergy）
 CREATE TABLE IF NOT EXISTS t_tag (
     _id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    recipe_id   VARCHAR(16) NOT NULL,           -- 关联 t_recipe.recipe_id
-    value       VARCHAR(50) NOT NULL,           -- 标签值 (如 sichuan, spicy)
-    label       VARCHAR(50) NOT NULL,           -- 显示名称 (如 川菜, 香辣)
-    type        VARCHAR(20) NOT NULL,           -- 类型: cuisine/flavor/scene
+    value       VARCHAR(50) NOT NULL,           -- 标签值 (如 sichuan, spicy, no_pork)
+    label       VARCHAR(50) NOT NULL,           -- 显示名称 (如 川菜, 香辣, 不吃猪肉)
+    type        VARCHAR(20) NOT NULL,           -- 类型: cuisine/flavor/scene/taboo/allergy
     created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_t_tag_recipe_id ON t_tag(recipe_id);
 CREATE INDEX IF NOT EXISTS idx_t_tag_value ON t_tag(value);
 CREATE INDEX IF NOT EXISTS idx_t_tag_type ON t_tag(type);
+-- 唯一索引：确保同一类型下 value 唯一
+CREATE UNIQUE INDEX IF NOT EXISTS idx_t_tag_type_value ON t_tag(type, value);
+
+-- 菜谱标签关联表（存储菜谱和标签的多对多关系）
+CREATE TABLE IF NOT EXISTS t_recipe_tag (
+    _id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    recipe_id   VARCHAR(32) NOT NULL,           -- 关联 t_recipe.recipe_id
+    tag_value   VARCHAR(50) NOT NULL,          -- 关联 t_tag.value
+    tag_type    VARCHAR(20) NOT NULL,          -- 关联 t_tag.type（冗余字段，优化查询）
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(recipe_id, tag_value, tag_type)    -- 防止重复关联
+);
+CREATE INDEX IF NOT EXISTS idx_t_recipe_tag_recipe_id ON t_recipe_tag(recipe_id);
+CREATE INDEX IF NOT EXISTS idx_t_recipe_tag_tag_value ON t_recipe_tag(tag_value);
+CREATE INDEX IF NOT EXISTS idx_t_recipe_tag_tag_type ON t_recipe_tag(tag_type);
+-- 联合索引：优化按菜谱和类型查询
+CREATE INDEX IF NOT EXISTS idx_t_recipe_tag_recipe_type ON t_recipe_tag(recipe_id, tag_type);
 
 -- ==================== 食材分类相关 ====================
 

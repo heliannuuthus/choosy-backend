@@ -57,377 +57,6 @@
                 }
             }
         },
-        "/api/favorites": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "favorites"
-                ],
-                "summary": "获取收藏列表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "分类筛选",
-                        "name": "category",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "搜索关键词",
-                        "name": "search",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "限制数量",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 0,
-                        "description": "偏移量",
-                        "name": "offset",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.FavoriteListResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            },
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "favorites"
-                ],
-                "summary": "添加收藏",
-                "parameters": [
-                    {
-                        "description": "收藏信息",
-                        "name": "favorite",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.FavoriteRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.FavoriteResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/favorites/batch-check": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "favorites"
-                ],
-                "summary": "批量检查收藏状态",
-                "parameters": [
-                    {
-                        "description": "菜谱ID列表",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.BatchCheckRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.BatchCheckResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/favorites/{recipe_id}": {
-            "delete": {
-                "tags": [
-                    "favorites"
-                ],
-                "summary": "取消收藏",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "菜谱ID",
-                        "name": "recipe_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/favorites/{recipe_id}/check": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "favorites"
-                ],
-                "summary": "检查是否已收藏",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "菜谱ID",
-                        "name": "recipe_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CheckFavoriteResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/history": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "history"
-                ],
-                "summary": "获取浏览历史列表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "分类筛选",
-                        "name": "category",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "搜索关键词",
-                        "name": "search",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "限制数量",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 0,
-                        "description": "偏移量",
-                        "name": "offset",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.HistoryListResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            },
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "history"
-                ],
-                "summary": "添加浏览记录",
-                "parameters": [
-                    {
-                        "description": "浏览记录信息",
-                        "name": "history",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.HistoryRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.HistoryResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "tags": [
-                    "history"
-                ],
-                "summary": "清空浏览历史",
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/history/{recipe_id}": {
-            "delete": {
-                "tags": [
-                    "history"
-                ],
-                "summary": "删除浏览记录",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "菜谱ID",
-                        "name": "recipe_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/api/home/banners": {
             "get": {
                 "produces": [
@@ -512,101 +141,25 @@
                 }
             }
         },
-        "/api/profile": {
+        "/api/preferences": {
             "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
+                "description": "获取口味、忌口、过敏的所有可选选项（从缓存索引获取，性能最优）",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "auth"
+                    "preference"
                 ],
-                "summary": "获取当前用户信息",
+                "summary": "获取所有偏好选项",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.UserProfile"
+                            "$ref": "#/definitions/preference.OptionsResponse"
                         }
                     },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "auth"
-                ],
-                "summary": "更新当前用户信息",
-                "parameters": [
-                    {
-                        "description": "更新请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.UpdateProfileRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.UserProfile"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -1044,6 +597,84 @@
                 }
             }
         },
+        "/api/tags": {
+            "get": {
+                "description": "获取标签列表，支持通过查询参数过滤。所有类型（cuisine/flavor/scene/taboo/allergy）都统一使用此接口",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tags"
+                ],
+                "summary": "获取标签列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "标签类型: cuisine/flavor/scene/taboo/allergy",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "菜谱ID（获取特定菜谱的标签，仅用于 cuisine/flavor/scene）",
+                        "name": "recipe_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.TagValueResponse"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "创建标签或选项。如果 recipe_id 为空，创建选项（仅支持 taboo/allergy）；如果 recipe_id 不为空，创建菜谱标签",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tags"
+                ],
+                "summary": "创建标签",
+                "parameters": [
+                    {
+                        "description": "标签信息",
+                        "name": "tag",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateTagRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.TagValueResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/tags/cuisines": {
             "get": {
                 "produces": [
@@ -1053,6 +684,7 @@
                     "tags"
                 ],
                 "summary": "获取所有菜系",
+                "deprecated": true,
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1075,6 +707,7 @@
                     "tags"
                 ],
                 "summary": "获取所有口味",
+                "deprecated": true,
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1097,6 +730,7 @@
                     "tags"
                 ],
                 "summary": "获取所有场景",
+                "deprecated": true,
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1104,6 +738,144 @@
                             "type": "array",
                             "items": {
                                 "$ref": "#/definitions/handlers.TagValueResponse"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/tags/{type}": {
+            "get": {
+                "description": "支持所有类型：cuisine/flavor/scene/taboo/allergy",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tags"
+                ],
+                "summary": "根据类型获取标签",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "标签类型: cuisine/flavor/scene/taboo/allergy",
+                        "name": "type",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.TagValueResponse"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/tags/{type}/{value}": {
+            "put": {
+                "description": "更新标签或选项的显示名称",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tags"
+                ],
+                "summary": "更新标签",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "标签类型",
+                        "name": "type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "标签值",
+                        "name": "value",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "菜谱ID（更新菜谱标签时必填，更新选项时留空）",
+                        "name": "recipe_id",
+                        "in": "query"
+                    },
+                    {
+                        "description": "更新内容",
+                        "name": "tag",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateTagRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.TagValueResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "删除标签或选项",
+                "tags": [
+                    "tags"
+                ],
+                "summary": "删除标签",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "标签类型",
+                        "name": "type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "标签值",
+                        "name": "value",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "菜谱ID（删除菜谱标签时必填，删除选项时留空）",
+                        "name": "recipe_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
                             }
                         }
                     }
@@ -1250,6 +1022,592 @@
                     }
                 }
             }
+        },
+        "/api/user/favorites": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "favorites"
+                ],
+                "summary": "获取收藏列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "分类筛选",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "搜索关键词",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "限制数量",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "偏移量",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.FavoriteListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "favorites"
+                ],
+                "summary": "添加收藏",
+                "parameters": [
+                    {
+                        "description": "收藏信息",
+                        "name": "favorite",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.FavoriteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.FavoriteResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/user/favorites/batch-check": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "favorites"
+                ],
+                "summary": "批量检查收藏状态",
+                "parameters": [
+                    {
+                        "description": "菜谱ID列表",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.BatchCheckRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.BatchCheckResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/user/favorites/{recipe_id}": {
+            "delete": {
+                "tags": [
+                    "favorites"
+                ],
+                "summary": "取消收藏",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "菜谱ID",
+                        "name": "recipe_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/user/favorites/{recipe_id}/check": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "favorites"
+                ],
+                "summary": "检查是否已收藏",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "菜谱ID",
+                        "name": "recipe_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CheckFavoriteResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/user/history": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "history"
+                ],
+                "summary": "获取浏览历史列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "分类筛选",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "搜索关键词",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "限制数量",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "偏移量",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.HistoryListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "history"
+                ],
+                "summary": "添加浏览记录",
+                "parameters": [
+                    {
+                        "description": "浏览记录信息",
+                        "name": "history",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.HistoryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.HistoryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "history"
+                ],
+                "summary": "清空浏览历史",
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/user/history/{recipe_id}": {
+            "delete": {
+                "tags": [
+                    "history"
+                ],
+                "summary": "删除浏览记录",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "菜谱ID",
+                        "name": "recipe_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/user/preference": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "获取当前用户的偏好设置（包含选中状态）",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "preference"
+                ],
+                "summary": "获取用户偏好",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/preference.UserPreferencesResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "更新当前用户的偏好设置（全量替换）",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "preference"
+                ],
+                "summary": "更新用户偏好",
+                "parameters": [
+                    {
+                        "description": "偏好设置",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/preference.UpdatePreferencesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/user/profile": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "获取当前用户信息",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UserProfile"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "更新当前用户信息",
+                "parameters": [
+                    {
+                        "description": "更新请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateProfileRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UserProfile"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1346,6 +1704,32 @@
                 },
                 "weather": {
                     "$ref": "#/definitions/handlers.WeatherInfo"
+                }
+            }
+        },
+        "handlers.CreateTagRequest": {
+            "type": "object",
+            "required": [
+                "label",
+                "type",
+                "value"
+            ],
+            "properties": {
+                "label": {
+                    "description": "显示名称",
+                    "type": "string"
+                },
+                "recipe_id": {
+                    "description": "菜谱ID（可选，为空时创建选项）",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "标签类型",
+                    "type": "string"
+                },
+                "value": {
+                    "description": "标签值",
+                    "type": "string"
                 }
             }
         },
@@ -1958,6 +2342,17 @@
                 }
             }
         },
+        "handlers.UpdateTagRequest": {
+            "type": "object",
+            "required": [
+                "label"
+            ],
+            "properties": {
+                "label": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.UploadImageResponse": {
             "type": "object",
             "properties": {
@@ -2001,6 +2396,114 @@
                 },
                 "weather": {
                     "type": "string"
+                }
+            }
+        },
+        "preference.OptionItem": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "description": "显示名称",
+                    "type": "string"
+                },
+                "value": {
+                    "description": "标签值",
+                    "type": "string"
+                }
+            }
+        },
+        "preference.OptionItemWithSelected": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "description": "显示名称",
+                    "type": "string"
+                },
+                "selected": {
+                    "description": "是否已选择",
+                    "type": "boolean"
+                },
+                "value": {
+                    "description": "标签值",
+                    "type": "string"
+                }
+            }
+        },
+        "preference.OptionsResponse": {
+            "type": "object",
+            "properties": {
+                "allergies": {
+                    "description": "过敏选项",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/preference.OptionItem"
+                    }
+                },
+                "flavors": {
+                    "description": "口味选项",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/preference.OptionItem"
+                    }
+                },
+                "taboos": {
+                    "description": "忌口选项",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/preference.OptionItem"
+                    }
+                }
+            }
+        },
+        "preference.UpdatePreferencesRequest": {
+            "type": "object",
+            "properties": {
+                "allergies": {
+                    "description": "过敏选项值列表",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "flavors": {
+                    "description": "口味选项值列表",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "taboos": {
+                    "description": "忌口选项值列表",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "preference.UserPreferencesResponse": {
+            "type": "object",
+            "properties": {
+                "allergies": {
+                    "description": "过敏偏好",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/preference.OptionItemWithSelected"
+                    }
+                },
+                "flavors": {
+                    "description": "口味偏好",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/preference.OptionItemWithSelected"
+                    }
+                },
+                "taboos": {
+                    "description": "忌口偏好",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/preference.OptionItemWithSelected"
+                    }
                 }
             }
         }

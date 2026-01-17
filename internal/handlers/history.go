@@ -52,7 +52,7 @@ type HistoryListResponse struct {
 // @Success 201 {object} HistoryResponse
 // @Failure 400 {object} map[string]string
 // @Failure 401 {object} map[string]string
-// @Router /api/history [post]
+// @Router /api/user/history [post]
 func (h *HistoryHandler) AddViewHistory(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
@@ -87,7 +87,7 @@ func (h *HistoryHandler) AddViewHistory(c *gin.Context) {
 // @Param recipe_id path string true "菜谱ID"
 // @Success 204
 // @Failure 401 {object} map[string]string
-// @Router /api/history/{recipe_id} [delete]
+// @Router /api/user/history/{recipe_id} [delete]
 func (h *HistoryHandler) RemoveViewHistory(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
@@ -112,7 +112,7 @@ func (h *HistoryHandler) RemoveViewHistory(c *gin.Context) {
 // @Tags history
 // @Success 204
 // @Failure 401 {object} map[string]string
-// @Router /api/history [delete]
+// @Router /api/user/history [delete]
 func (h *HistoryHandler) ClearViewHistory(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
@@ -141,7 +141,7 @@ func (h *HistoryHandler) ClearViewHistory(c *gin.Context) {
 // @Param offset query int false "偏移量" default(0)
 // @Success 200 {object} HistoryListResponse
 // @Failure 401 {object} map[string]string
-// @Router /api/history [get]
+// @Router /api/user/history [get]
 func (h *HistoryHandler) GetViewHistory(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {

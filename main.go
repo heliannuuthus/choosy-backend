@@ -93,10 +93,6 @@ func main() {
 		api.POST("/revoke-all", middleware.RequireAuth(), app.AuthHandler.LogoutAll)
 		api.GET("/stats", middleware.RequireAuth(), app.AuthHandler.GetStats) // 获取统计数据
 
-		// 用户信息路由
-		api.GET("/profile", middleware.RequireAuth(), app.AuthHandler.Profile)
-		api.PUT("/profile", middleware.RequireAuth(), app.AuthHandler.UpdateProfile)
-
 		// 菜谱路由
 		recipes := api.Group("/recipes")
 		{
@@ -109,25 +105,40 @@ func main() {
 			recipes.DELETE("/:recipe_id", app.RecipeHandler.DeleteRecipe)
 		}
 
-		// 收藏路由
-		favorites := api.Group("/favorites")
-		favorites.Use(middleware.RequireAuth())
+		// 用户相关路由（统一使用 /user 前缀）
+		user := api.Group("/user")
 		{
-			favorites.GET("", app.FavoriteHandler.GetFavorites)
-			favorites.POST("", app.FavoriteHandler.AddFavorite)
-			favorites.POST("/batch-check", app.FavoriteHandler.BatchCheckFavorites)
-			favorites.GET("/:recipe_id/check", app.FavoriteHandler.CheckFavorite)
-			favorites.DELETE("/:recipe_id", app.FavoriteHandler.RemoveFavorite)
-		}
+			// 用户信息路由
+			user.GET("/profile", middleware.RequireAuth(), app.AuthHandler.Profile)
+			user.PUT("/profile", middleware.RequireAuth(), app.AuthHandler.UpdateProfile)
 
-		// 浏览历史路由
-		history := api.Group("/history")
-		history.Use(middleware.RequireAuth())
-		{
-			history.GET("", app.HistoryHandler.GetViewHistory)
-			history.POST("", app.HistoryHandler.AddViewHistory)
-			history.DELETE("", app.HistoryHandler.ClearViewHistory)
-			history.DELETE("/:recipe_id", app.HistoryHandler.RemoveViewHistory)
+			// 收藏路由
+			favorites := user.Group("/favorites")
+			favorites.Use(middleware.RequireAuth())
+			{
+				favorites.GET("", app.FavoriteHandler.GetFavorites)
+				favorites.POST("", app.FavoriteHandler.AddFavorite)
+				favorites.POST("/batch-check", app.FavoriteHandler.BatchCheckFavorites)
+				favorites.GET("/:recipe_id/check", app.FavoriteHandler.CheckFavorite)
+				favorites.DELETE("/:recipe_id", app.FavoriteHandler.RemoveFavorite)
+			}
+
+			// 浏览历史路由
+			history := user.Group("/history")
+			history.Use(middleware.RequireAuth())
+			{
+				history.GET("", app.HistoryHandler.GetViewHistory)
+				history.POST("", app.HistoryHandler.AddViewHistory)
+				history.DELETE("", app.HistoryHandler.ClearViewHistory)
+				history.DELETE("/:recipe_id", app.HistoryHandler.RemoveViewHistory)
+			}
+
+			// 用户偏好路由
+			preference := user.Group("/preference")
+			{
+				preference.GET("", middleware.RequireAuth(), app.PreferenceHandler.GetUserPreferences)    // 获取用户偏好（需登录）
+				preference.PUT("", middleware.RequireAuth(), app.PreferenceHandler.UpdateUserPreferences) // 更新用户偏好（需登录）
+			}
 		}
 
 		// 首页路由
@@ -137,9 +148,35 @@ func main() {
 			home.GET("/hot", app.HomeHandler.GetHotRecipes)
 		}
 
-		// 标签路由
+		// 偏好选项路由（无需登录，获取所有可选选项）
+		api.GET("/preferences", app.PreferenceHandler.GetOptions)
+
+		// 标签路由（RESTful 风格，统一管理所有标签和选项）
 		tags := api.Group("/tags")
 		{
+			// GET /api/tags - 获取标签列表（支持查询参数）
+			// GET /api/tags?type=cuisine - 获取特定类型的标签
+			// GET /api/tags?type=taboo - 获取特定类型的选项
+			// GET /api/tags?type=flavor&recipe_id=xxx - 获取特定菜谱的标签
+			tags.GET("", app.TagHandler.ListTags)
+
+			// GET /api/tags/{type} - 获取特定类型的标签/选项
+			// 支持所有类型：cuisine/flavor/scene/taboo/allergy
+			tags.GET("/:type", app.TagHandler.GetTagsByType)
+
+			// POST /api/tags - 创建标签/选项（后台管理）
+			// recipe_id 为空时创建选项，不为空时创建菜谱标签
+			tags.POST("", middleware.RequireAuth(), app.TagHandler.CreateTag)
+
+			// PUT /api/tags/{type}/{value} - 更新标签/选项（后台管理）
+			// recipe_id 查询参数为空时更新选项，不为空时更新菜谱标签
+			tags.PUT("/:type/:value", middleware.RequireAuth(), app.TagHandler.UpdateTag)
+
+			// DELETE /api/tags/{type}/{value} - 删除标签/选项（后台管理）
+			// recipe_id 查询参数为空时删除选项，不为空时删除菜谱标签
+			tags.DELETE("/:type/:value", middleware.RequireAuth(), app.TagHandler.DeleteTag)
+
+			// 向后兼容的旧接口
 			tags.GET("/cuisines", app.TagHandler.GetCuisines)
 			tags.GET("/flavors", app.TagHandler.GetFlavors)
 			tags.GET("/scenes", app.TagHandler.GetScenes)
