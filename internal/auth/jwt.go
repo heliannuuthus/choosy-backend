@@ -342,8 +342,8 @@ func getUnionIDP(idp string) string {
 	switch idp {
 	case IDPWechatMP, IDPWechatOA:
 		return IDPWechatUnionID
-	case IDPDouyinMP:
-		return IDPDouyinUnionID
+	case IDPTTMP:
+		return IDPTTUnionID
 	default:
 		return idp + ":unionid"
 	}

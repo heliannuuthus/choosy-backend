@@ -1,11 +1,15 @@
 package auth
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+
+	"github.com/tidwall/gjson"
 
 	"choosy-backend/internal/config"
 	"choosy-backend/internal/logger"
@@ -80,67 +84,105 @@ func (s *Service) GenerateToken(wxResult *WxCode2SessionResponse, nickname, avat
 	return GenerateTokenPair(s.db, params)
 }
 
-// TtCode2Session 调用抖音 code2session 接口
+// TtCode2Session 调用 TT code2session 接口
 func (s *Service) TtCode2Session(code string) (*TtCode2SessionResponse, error) {
 	appid := config.GetString("idps.tt.appid")
 	secret := config.GetString("idps.tt.secret")
 	if appid == "" || secret == "" {
-		return nil, errors.New("抖音小程序 IdP 未配置")
+		return nil, errors.New("TT 小程序 IdP 未配置")
 	}
 
-	logger.Infof("[Auth] 抖音登录请求 - Code: %s...", code[:min(len(code), 10)])
+	logger.Infof("[Auth] TT 登录请求 - Code: %s...", code[:min(len(code), 10)])
 
-	params := url.Values{}
-	params.Set("appid", appid)
-	params.Set("secret", secret)
-	params.Set("code", code)
-
-	reqURL := "https://developer.toutiao.com/api/apps/v2/jscode2session?" + params.Encode()
-
-	resp, err := http.Get(reqURL)
+	// 抖音 API 使用 POST 请求，body 为 JSON
+	reqBody := map[string]string{
+		"appid":  appid,
+		"secret": secret,
+		"code":   code,
+	}
+	reqBodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
-		logger.Errorf("[Auth] 请求抖音接口失败: %v", err)
-		return nil, fmt.Errorf("请求抖音接口失败: %w", err)
+		logger.Errorf("[Auth] 构建 TT 请求体失败: %v", err)
+		return nil, fmt.Errorf("构建 TT 请求体失败: %w", err)
+	}
+
+	reqURL := "https://developer.toutiao.com/api/apps/v2/jscode2session"
+
+	req, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(reqBodyBytes))
+	if err != nil {
+		logger.Errorf("[Auth] 创建 TT 请求失败: %v", err)
+		return nil, fmt.Errorf("创建 TT 请求失败: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		logger.Errorf("[Auth] 请求 TT 接口失败: %v", err)
+		return nil, fmt.Errorf("请求 TT 接口失败: %w", err)
 	}
 	defer resp.Body.Close()
 
-	var result struct {
-		ErrNo   int    `json:"err_no"`
-		ErrTips string `json:"err_tips"`
-		Data    struct {
-			OpenID     string `json:"openid"`
-			SessionKey string `json:"session_key"`
-			UnionID    string `json:"unionid,omitempty"`
-		} `json:"data"`
+	// 先检查 HTTP 状态码
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		logger.Errorf("[Auth] TT API 返回非 200 状态码: %d, 响应: %s", resp.StatusCode, string(bodyBytes))
+		return nil, fmt.Errorf("TT API 请求失败: HTTP %d", resp.StatusCode)
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		logger.Errorf("[Auth] 解析抖音响应失败: %v", err)
-		return nil, fmt.Errorf("解析抖音响应失败: %w", err)
+	// 读取响应体
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.Errorf("[Auth] 读取 TT 响应失败: %v", err)
+		return nil, fmt.Errorf("读取 TT 响应失败: %w", err)
 	}
 
-	if result.ErrNo != 0 {
-		logger.Errorf("[Auth] 抖音登录失败 - ErrNo: %d, ErrTips: %s", result.ErrNo, result.ErrTips)
-		return nil, fmt.Errorf("抖音登录失败: %s", result.ErrTips)
+	logger.Infof("[Auth] TT API 原始响应: %s", string(bodyBytes))
+
+	// 使用 gjson 快速检查错误码
+	errNo := gjson.GetBytes(bodyBytes, "err_no").Int()
+	errTips := gjson.GetBytes(bodyBytes, "err_tips").String()
+
+	// 如果存在错误，直接返回
+	if errNo != 0 {
+		logger.Errorf("[Auth] TT 登录失败 - ErrNo: %d, ErrTips: %s", errNo, errTips)
+		return nil, fmt.Errorf("TT 登录失败: %s", errTips)
 	}
 
-	unionID := "(无)"
-	if result.Data.UnionID != "" {
-		unionID = result.Data.UnionID
+	// 检查 data 字段是否存在且不为 null
+	dataRaw := gjson.GetBytes(bodyBytes, "data")
+	if !dataRaw.Exists() || dataRaw.Raw == "null" {
+		logger.Errorf("[Auth] TT 响应 data 字段为空或 null")
+		return nil, fmt.Errorf("TT 登录失败: 响应数据为空")
 	}
-	logger.Infof("[Auth] 抖音登录成功 - T_OpenID: %s, UnionID: %s", result.Data.OpenID, unionID)
+
+	// 使用 gjson 提取 data 字段中的值
+	openID := gjson.GetBytes(bodyBytes, "data.openid").String()
+	sessionKey := gjson.GetBytes(bodyBytes, "data.session_key").String()
+	unionID := gjson.GetBytes(bodyBytes, "data.unionid").String()
+
+	// 验证必要字段
+	if openID == "" || sessionKey == "" {
+		logger.Errorf("[Auth] TT 响应缺少必要字段 - openid: %s, session_key: %s", openID, sessionKey)
+		return nil, fmt.Errorf("TT 登录失败: 响应数据不完整")
+	}
+
+	unionIDDisplay := "(无)"
+	if unionID != "" {
+		unionIDDisplay = unionID
+	}
+	logger.Infof("[Auth] TT 登录成功 - T_OpenID: %s, UnionID: %s", openID, unionIDDisplay)
 
 	return &TtCode2SessionResponse{
-		OpenID:     result.Data.OpenID,
-		SessionKey: result.Data.SessionKey,
-		UnionID:    result.Data.UnionID,
+		OpenID:     openID,
+		SessionKey: sessionKey,
+		UnionID:    unionID,
 	}, nil
 }
 
-// GenerateTokenFromTt 生成 token（抖音小程序登录）
+// GenerateTokenFromTt 生成 token（TT 小程序登录）
 func (s *Service) GenerateTokenFromTt(ttResult *TtCode2SessionResponse, nickname, avatar string) (*TokenPair, error) {
 	params := &LoginParams{
-		IDP:      IDPDouyinMP,
+		IDP:      IDPTTMP,
 		TOpenID:  ttResult.OpenID,
 		UnionID:  ttResult.UnionID,
 		Nickname: nickname,

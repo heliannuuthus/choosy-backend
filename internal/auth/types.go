@@ -41,7 +41,7 @@ type WxCode2SessionResponse struct {
 	ErrMsg     string `json:"errmsg,omitempty"`
 }
 
-// TtCode2SessionResponse 抖音 code2session 响应
+// TtCode2SessionResponse TT code2session 响应
 type TtCode2SessionResponse struct {
 	OpenID     string `json:"openid"`
 	SessionKey string `json:"session_key"`
@@ -65,8 +65,8 @@ const (
 	IDPWechatMP      = "wechat:mp"      // 微信小程序
 	IDPWechatUnionID = "wechat:unionid" // 微信 UnionID
 	IDPWechatOA      = "wechat:oa"      // 微信公众号
-	IDPDouyinMP      = "douyin:mp"      // 抖音小程序
-	IDPDouyinUnionID = "douyin:unionid" // 抖音 UnionID
+	IDPTTMP          = "tt:mp"          // TT 小程序
+	IDPTTUnionID     = "tt:unionid"     // TT UnionID
 	IDPAlipayMP      = "alipay:mp"      // 支付宝小程序
 	IDPAppleSignIn   = "apple:signin"   // Apple 登录
 )

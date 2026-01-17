@@ -59,7 +59,7 @@ const (
 
 type TokenRequest struct {
 	GrantType    string `form:"grant_type" binding:"required,oneof=authorization_code refresh_token"`
-	Code         string `form:"code"` // 格式：idp:code，如 wechat:mp:xxx 或 douyin:mp:xxx
+	Code         string `form:"code"` // 格式：idp:code，如 wechat:mp:xxx 或 tt:mp:xxx
 	RefreshToken string `form:"refresh_token"`
 	Nickname     string `form:"nickname"`
 	Avatar       string `form:"avatar"`
@@ -123,13 +123,13 @@ func (h *AuthHandler) handleAuthorizationCode(c *gin.Context, code, nickname, av
 		return
 	}
 
-	// 解析 code，格式：idp:actual_code，如 wechat:mp:xxx 或 douyin:mp:xxx
+	// 解析 code，格式：idp:actual_code，如 wechat:mp:xxx 或 tt:mp:xxx
 	// 所有平台都必须显式指定 idp，不区分对待
 	parts := strings.SplitN(code, ":", 3)
 	if len(parts) < 3 {
 		c.JSON(http.StatusBadRequest, OAuth2Error{
 			Error:            "invalid_request",
-			ErrorDescription: "code format must be idp:actual_code (e.g., wechat:mp:xxx, douyin:mp:xxx)",
+			ErrorDescription: "code format must be idp:actual_code (e.g., wechat:mp:xxx, tt:mp:xxx)",
 		})
 		return
 	}
@@ -138,10 +138,10 @@ func (h *AuthHandler) handleAuthorizationCode(c *gin.Context, code, nickname, av
 	actualCode := parts[2]
 
 	// 验证 idp 是否支持
-	if idp != auth.IDPWechatMP && idp != auth.IDPDouyinMP && idp != auth.IDPAlipayMP {
+	if idp != auth.IDPWechatMP && idp != auth.IDPTTMP && idp != auth.IDPAlipayMP {
 		c.JSON(http.StatusBadRequest, OAuth2Error{
 			Error:            "unsupported_idp",
-			ErrorDescription: fmt.Sprintf("不支持的平台: %s，支持的平台: %s, %s, %s", idp, auth.IDPWechatMP, auth.IDPDouyinMP, auth.IDPAlipayMP),
+			ErrorDescription: fmt.Sprintf("不支持的平台: %s，支持的平台: %s, %s, %s", idp, auth.IDPWechatMP, auth.IDPTTMP, auth.IDPAlipayMP),
 		})
 		return
 	}
@@ -188,21 +188,21 @@ func (h *AuthHandler) handleAuthorizationCode(c *gin.Context, code, nickname, av
 			return
 		}
 
-	case auth.IDPDouyinMP:
+	case auth.IDPTTMP:
 		appid := config.GetString("idps.tt.appid")
 		secret := config.GetString("idps.tt.secret")
 		if appid == "" || secret == "" {
-			logger.Error("抖音配置缺失: idps.tt.appid 或 idps.tt.secret 未设置")
+			logger.Error("TT 配置缺失: idps.tt.appid 或 idps.tt.secret 未设置")
 			c.JSON(http.StatusInternalServerError, OAuth2Error{
 				Error:            "server_error",
-				ErrorDescription: "抖音小程序配置缺失",
+				ErrorDescription: "TT 小程序配置缺失",
 			})
 			return
 		}
 
 		ttResult, err := h.service.TtCode2Session(actualCode)
 		if err != nil {
-			logger.Errorf("抖音登录失败: %v", err)
+			logger.Errorf("TT 登录失败: %v", err)
 			c.JSON(http.StatusBadRequest, OAuth2Error{
 				Error:            "invalid_grant",
 				ErrorDescription: err.Error(),

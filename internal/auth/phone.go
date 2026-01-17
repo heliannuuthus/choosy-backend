@@ -21,8 +21,8 @@ func GetPhoneProvider(idp string) (PhoneProvider, error) {
 	switch idp {
 	case IDPWechatMP:
 		return &WechatPhoneProvider{}, nil
-	case IDPDouyinMP:
-		return &DouyinPhoneProvider{}, nil
+	case IDPTTMP:
+		return &TTPhoneProvider{}, nil
 	case IDPAlipayMP:
 		return &AlipayPhoneProvider{}, nil
 	default:
@@ -124,9 +124,9 @@ func getWxAccessToken() (string, error) {
 	return result.AccessToken, nil
 }
 
-// ==================== 抖音实现 ====================
+// ==================== TT 实现 ====================
 
-type DouyinPhoneProvider struct{}
+type TTPhoneProvider struct{}
 
 type ttPhoneResponse struct {
 	ErrNo   int    `json:"err_no"`
@@ -136,11 +136,11 @@ type ttPhoneResponse struct {
 	} `json:"data"`
 }
 
-func (p *DouyinPhoneProvider) GetPhoneNumber(code string) (string, error) {
+func (p *TTPhoneProvider) GetPhoneNumber(code string) (string, error) {
 	appid := config.GetString("idps.tt.appid")
 	secret := config.GetString("idps.tt.secret")
 	if appid == "" || secret == "" {
-		return "", errors.New("抖音小程序配置缺失")
+		return "", errors.New("TT 小程序配置缺失")
 	}
 
 	// 获取 access_token
@@ -154,44 +154,44 @@ func (p *DouyinPhoneProvider) GetPhoneNumber(code string) (string, error) {
 	body := fmt.Sprintf(`{"code":"%s"}`, code)
 	resp, err := http.Post(url, "application/json", strings.NewReader(body))
 	if err != nil {
-		logger.Errorf("[Auth] 请求抖音获取手机号接口失败: %v", err)
-		return "", fmt.Errorf("请求抖音接口失败: %w", err)
+		logger.Errorf("[Auth] 请求 TT 获取手机号接口失败: %v", err)
+		return "", fmt.Errorf("请求 TT 接口失败: %w", err)
 	}
 	defer resp.Body.Close()
 
 	var result ttPhoneResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		logger.Errorf("[Auth] 解析抖音手机号响应失败: %v", err)
-		return "", fmt.Errorf("解析抖音响应失败: %w", err)
+		logger.Errorf("[Auth] 解析 TT 手机号响应失败: %v", err)
+		return "", fmt.Errorf("解析 TT 响应失败: %w", err)
 	}
 
 	if result.ErrNo != 0 {
-		logger.Errorf("[Auth] 抖音获取手机号失败 - ErrNo: %d, ErrTips: %s", result.ErrNo, result.ErrTips)
-		return "", fmt.Errorf("抖音获取手机号失败: %s", result.ErrTips)
+		logger.Errorf("[Auth] TT 获取手机号失败 - ErrNo: %d, ErrTips: %s", result.ErrNo, result.ErrTips)
+		return "", fmt.Errorf("TT 获取手机号失败: %s", result.ErrTips)
 	}
 
 	phone := result.Data.PhoneNumber
 	if phone == "" {
-		return "", errors.New("抖音返回的手机号为空")
+		return "", errors.New("TT 返回的手机号为空")
 	}
 
-	logger.Infof("[Auth] 抖音获取手机号成功 - Phone: %s***%s", phone[:3], phone[len(phone)-4:])
+	logger.Infof("[Auth] TT 获取手机号成功 - Phone: %s***%s", phone[:3], phone[len(phone)-4:])
 	return phone, nil
 }
 
-// getTtAccessToken 获取抖音 access_token
+// getTtAccessToken 获取 TT access_token
 func getTtAccessToken() (string, error) {
 	appid := config.GetString("idps.tt.appid")
 	secret := config.GetString("idps.tt.secret")
 	if appid == "" || secret == "" {
-		return "", errors.New("抖音小程序配置缺失")
+		return "", errors.New("TT 小程序配置缺失")
 	}
 
 	url := fmt.Sprintf("https://developer.toutiao.com/api/apps/v2/token?appid=%s&secret=%s&grant_type=client_credential", appid, secret)
 
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("请求抖音 access_token 失败: %w", err)
+		return "", fmt.Errorf("请求 TT access_token 失败: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -205,11 +205,11 @@ func getTtAccessToken() (string, error) {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("解析抖音 access_token 响应失败: %w", err)
+		return "", fmt.Errorf("解析 TT access_token 响应失败: %w", err)
 	}
 
 	if result.ErrNo != 0 {
-		return "", fmt.Errorf("获取抖音 access_token 失败: %s", result.ErrTips)
+		return "", fmt.Errorf("获取 TT access_token 失败: %s", result.ErrTips)
 	}
 
 	return result.Data.AccessToken, nil
