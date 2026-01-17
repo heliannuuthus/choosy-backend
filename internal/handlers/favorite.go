@@ -64,7 +64,7 @@ type BatchCheckResponse struct {
 // @Success 201 {object} FavoriteResponse
 // @Failure 400 {object} map[string]string
 // @Failure 401 {object} map[string]string
-// @Router /api/favorites [post]
+// @Router /api/user/favorites [post]
 func (h *FavoriteHandler) AddFavorite(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
@@ -99,7 +99,7 @@ func (h *FavoriteHandler) AddFavorite(c *gin.Context) {
 // @Param recipe_id path string true "菜谱ID"
 // @Success 204
 // @Failure 401 {object} map[string]string
-// @Router /api/favorites/{recipe_id} [delete]
+// @Router /api/user/favorites/{recipe_id} [delete]
 func (h *FavoriteHandler) RemoveFavorite(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
@@ -126,7 +126,7 @@ func (h *FavoriteHandler) RemoveFavorite(c *gin.Context) {
 // @Param recipe_id path string true "菜谱ID"
 // @Success 200 {object} CheckFavoriteResponse
 // @Failure 401 {object} map[string]string
-// @Router /api/favorites/{recipe_id}/check [get]
+// @Router /api/user/favorites/{recipe_id}/check [get]
 func (h *FavoriteHandler) CheckFavorite(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
@@ -159,7 +159,7 @@ func (h *FavoriteHandler) CheckFavorite(c *gin.Context) {
 // @Param offset query int false "偏移量" default(0)
 // @Success 200 {object} FavoriteListResponse
 // @Failure 401 {object} map[string]string
-// @Router /api/favorites [get]
+// @Router /api/user/favorites [get]
 func (h *FavoriteHandler) GetFavorites(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
@@ -228,7 +228,7 @@ func (h *FavoriteHandler) GetFavorites(c *gin.Context) {
 // @Param request body BatchCheckRequest true "菜谱ID列表"
 // @Success 200 {object} BatchCheckResponse
 // @Failure 401 {object} map[string]string
-// @Router /api/favorites/batch-check [post]
+// @Router /api/user/favorites/batch-check [post]
 func (h *FavoriteHandler) BatchCheckFavorites(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {

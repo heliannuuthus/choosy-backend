@@ -92,9 +92,24 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 		if prefix == "" {
 			prefix = "images"
 		}
-		// 使用 prefix + filename（按日期组织）
-		now := time.Now()
-		objectKey = fmt.Sprintf("%s/%04d/%02d/%02d/%s", prefix, now.Year(), now.Month(), now.Day(), file.Filename)
+		
+		// 如果是头像上传（prefix 为 "avatars"），强制使用认证用户的 openid 生成固定路径
+		// 这样可以防止前端传入错误的 openid 导致安全风险
+		if prefix == "avatars" {
+			objectKey = fmt.Sprintf("avatars/%s.jpg", identity.GetOpenID())
+		} else {
+			// 其他类型使用 prefix + filename（按日期组织）
+			now := time.Now()
+			objectKey = fmt.Sprintf("%s/%04d/%02d/%02d/%s", prefix, now.Year(), now.Month(), now.Day(), file.Filename)
+		}
+	} else {
+		// 如果前端传入了 object-key，检查是否是头像路径
+		// 如果是头像路径，强制使用认证用户的 openid（防止路径篡改）
+		if strings.HasPrefix(objectKey, "avatars/") && strings.HasSuffix(objectKey, ".jpg") {
+			// 忽略前端传入的 openid，使用认证 token 中的 openid
+			objectKey = fmt.Sprintf("avatars/%s.jpg", identity.GetOpenID())
+			logger.Infof("[Upload] 检测到头像上传，强制使用认证 OpenID 生成路径 - OpenID: %s", identity.GetOpenID())
+		}
 	}
 
 	// 构建预期的 OSS URL（立即返回给前端）
@@ -164,18 +179,16 @@ func (h *UploadHandler) uploadToOSSAsync(openid, objectKey string, reader io.Rea
 }
 
 // updateAvatarIfNeeded 如果是头像上传，更新用户头像
+// 注意：此时 objectKey 已经保证是正确的（由认证用户的 openid 生成），无需再次验证
 func (h *UploadHandler) updateAvatarIfNeeded(openid, objectKey, uploadURL string) {
 	// 如果是头像上传（路径为 avatars/{openid}.jpg），自动更新用户头像
+	// objectKey 已经由后端强制生成，保证 openid 正确，无需再次验证
 	if strings.HasPrefix(objectKey, "avatars/") && strings.HasSuffix(objectKey, ".jpg") {
-		expectedOpenID := strings.TrimPrefix(objectKey, "avatars/")
-		expectedOpenID = strings.TrimSuffix(expectedOpenID, ".jpg")
-		if expectedOpenID == openid {
-			// 更新用户头像
-			if err := h.db.Model(&models.User{}).Where("openid = ?", openid).Update("avatar", uploadURL).Error; err != nil {
-				logger.Errorf("[Upload] 更新用户头像失败 - OpenID: %s, URL: %s, Error: %v", openid, uploadURL, err)
-			} else {
-				logger.Infof("[Upload] 用户头像已更新 - OpenID: %s, URL: %s", openid, uploadURL)
-			}
+		// 更新用户头像
+		if err := h.db.Model(&models.User{}).Where("openid = ?", openid).Update("avatar", uploadURL).Error; err != nil {
+			logger.Errorf("[Upload] 更新用户头像失败 - OpenID: %s, URL: %s, Error: %v", openid, uploadURL, err)
+		} else {
+			logger.Infof("[Upload] 用户头像已更新 - OpenID: %s, URL: %s", openid, uploadURL)
 		}
 	}
 }

@@ -240,7 +240,7 @@ type UserProfile struct {
 // @Success 200 {object} UserProfile
 // @Failure 401 {object} map[string]string
 // @Failure 404 {object} map[string]string
-// @Router /api/profile [get]
+// @Router /api/user/profile [get]
 func (h *AuthHandler) Profile(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
@@ -290,7 +290,7 @@ type UpdateProfileRequest struct {
 // @Failure 400 {object} map[string]string
 // @Failure 401 {object} map[string]string
 // @Failure 404 {object} map[string]string
-// @Router /api/profile [put]
+// @Router /api/user/profile [put]
 func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {

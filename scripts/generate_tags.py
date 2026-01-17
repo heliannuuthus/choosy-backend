@@ -84,9 +84,9 @@ def get_recipes_without_tags(conn: sqlite3.Connection, limit: int = None):
     cursor = conn.cursor()
     query = """
         SELECT r.recipe_id, r.name, r.description, r.category
-        FROM recipes r
+        FROM t_recipe r
         WHERE NOT EXISTS (
-            SELECT 1 FROM tags t WHERE t.recipe_id = r.recipe_id
+            SELECT 1 FROM t_recipe_tag rt WHERE rt.recipe_id = r.recipe_id
         )
         ORDER BY r.recipe_id
     """
@@ -98,17 +98,25 @@ def get_recipes_without_tags(conn: sqlite3.Connection, limit: int = None):
 
 def get_recipe_ingredients(conn: sqlite3.Connection, recipe_id: str):
     cursor = conn.cursor()
-    cursor.execute("SELECT name FROM ingredients WHERE recipe_id = ?", (recipe_id,))
+    cursor.execute("SELECT name FROM t_ingredient WHERE recipe_id = ?", (recipe_id,))
     return [row[0] for row in cursor.fetchall()]
 
 
 def add_tag(conn: sqlite3.Connection, recipe_id: str, value: str, tag_type: str):
-    """直接插入 tags 表"""
+    """添加标签：先确保标签定义存在，然后创建关联关系"""
     label = TAG_LABELS.get(value, value)
     cursor = conn.cursor()
+    
+    # 1. 确保标签定义存在（如果不存在则创建）
     cursor.execute(
-        "INSERT INTO tags (recipe_id, value, label, type) VALUES (?, ?, ?, ?)",
-        (recipe_id, value, label, tag_type)
+        "INSERT OR IGNORE INTO t_tag (value, label, type) VALUES (?, ?, ?)",
+        (value, label, tag_type)
+    )
+    
+    # 2. 创建关联关系
+    cursor.execute(
+        "INSERT OR IGNORE INTO t_recipe_tag (recipe_id, tag_value, tag_type) VALUES (?, ?, ?)",
+        (recipe_id, value, tag_type)
     )
 
 

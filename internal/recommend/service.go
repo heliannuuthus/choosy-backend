@@ -11,6 +11,7 @@ import (
 	"choosy-backend/internal/config"
 	"choosy-backend/internal/logger"
 	"choosy-backend/internal/models"
+	"choosy-backend/internal/tag"
 	"choosy-backend/internal/utils"
 
 	"github.com/invopop/jsonschema"
@@ -606,7 +607,7 @@ func (s *Service) queryRecipesByIDs(ids []string) ([]models.Recipe, error) {
 	return recipes, err
 }
 
-// fillTags 填充菜谱的标签信息
+// fillTags 填充菜谱的标签信息（内存组装，避免 JOIN）
 func (s *Service) fillTags(recipes []models.Recipe) error {
 	if len(recipes) == 0 {
 		return nil
@@ -617,18 +618,43 @@ func (s *Service) fillTags(recipes []models.Recipe) error {
 		recipeIDs[i] = r.RecipeID
 	}
 
-	var tags []models.Tag
-	if err := s.db.Where("recipe_id IN ?", recipeIDs).Find(&tags).Error; err != nil {
+	// 1. 查询关联表（不 JOIN，避免连表查询）
+	var recipeTags []models.RecipeTag
+	if err := s.db.Where("recipe_id IN ?", recipeIDs).Find(&recipeTags).Error; err != nil {
 		return err
 	}
 
-	recipeTagsMap := make(map[string][]models.Tag)
-	for _, t := range tags {
-		recipeTagsMap[t.RecipeID] = append(recipeTagsMap[t.RecipeID], t)
+	if len(recipeTags) == 0 {
+		// 没有标签，直接返回空
+		for i := range recipes {
+			recipes[i].Tags = []models.Tag{}
+		}
+		return nil
 	}
 
+	// 2. 从缓存获取标签定义（避免数据库查询）
+	tagCache := tag.GetTagCache()
+	if !tagCache.IsLoaded() {
+		if err := tagCache.Load(s.db); err != nil {
+			return err
+		}
+	}
+
+	// 3. 按 recipe_id 分组组装（从缓存获取标签定义）
+	recipeTagsMap := make(map[string][]models.Tag)
+	for _, rt := range recipeTags {
+		if tag, ok := tagCache.Get(rt.TagType, rt.TagValue); ok {
+			recipeTagsMap[rt.RecipeID] = append(recipeTagsMap[rt.RecipeID], *tag)
+		}
+	}
+
+	// 6. 填充到 recipes
 	for i := range recipes {
-		recipes[i].Tags = recipeTagsMap[recipes[i].RecipeID]
+		if tags, ok := recipeTagsMap[recipes[i].RecipeID]; ok {
+			recipes[i].Tags = tags
+		} else {
+			recipes[i].Tags = []models.Tag{}
+		}
 	}
 
 	return nil
