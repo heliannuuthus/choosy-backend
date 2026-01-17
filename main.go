@@ -4,12 +4,10 @@ import (
 	"fmt"
 
 	"choosy-backend/internal/config"
-	"choosy-backend/internal/database"
 	"choosy-backend/internal/handlers"
 	"choosy-backend/internal/logger"
 	"choosy-backend/internal/middleware"
 	"choosy-backend/internal/oss"
-	"choosy-backend/internal/tag"
 
 	_ "choosy-backend/docs" // swagger docs
 

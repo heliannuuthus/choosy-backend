@@ -3,17 +3,12 @@ package tag
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"choosy-backend/internal/models"
 
 	"gorm.io/gorm"
 )
 
-const (
-	// 延迟双删延迟时间（与 cache.go 保持一致）
-	tagDeleteDelay = 100 * time.Millisecond
-)
 
 // Service 标签服务
 type Service struct {

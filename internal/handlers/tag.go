@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strings"
 
 	"choosy-backend/internal/models"
 	"choosy-backend/internal/tag"

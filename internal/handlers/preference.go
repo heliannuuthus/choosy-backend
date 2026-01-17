@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"choosy-backend/internal/auth"
 	"choosy-backend/internal/logger"
 	"choosy-backend/internal/preference"
 	"choosy-backend/internal/tag"
@@ -55,13 +56,14 @@ func (h *PreferenceHandler) GetOptions(c *gin.Context) {
 // @Router /api/user/preference [get]
 func (h *PreferenceHandler) GetUserPreferences(c *gin.Context) {
 	// 获取当前用户
-	openid, exists := c.Get("openid")
+	user, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "未授权"})
 		return
 	}
 
-	prefs, err := h.service.GetUserPreferences(openid.(string))
+	identity := user.(*auth.Identity)
+	prefs, err := h.service.GetUserPreferences(identity.OpenID)
 	if err != nil {
 		logger.Error("获取用户偏好失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取用户偏好失败"})
@@ -86,12 +88,13 @@ func (h *PreferenceHandler) GetUserPreferences(c *gin.Context) {
 // @Router /api/user/preference [put]
 func (h *PreferenceHandler) UpdateUserPreferences(c *gin.Context) {
 	// 获取当前用户
-	openid, exists := c.Get("openid")
+	user, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "未授权"})
 		return
 	}
 
+	identity := user.(*auth.Identity)
 	var req preference.UpdatePreferencesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误: " + err.Error()})
@@ -106,7 +109,7 @@ func (h *PreferenceHandler) UpdateUserPreferences(c *gin.Context) {
 	}
 
 	// 更新偏好
-	if err := h.service.UpdateUserPreferences(openid.(string), &req); err != nil {
+	if err := h.service.UpdateUserPreferences(identity.OpenID, &req); err != nil {
 		logger.Error("更新用户偏好失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新用户偏好失败"})
 		return

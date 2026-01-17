@@ -183,15 +183,15 @@ func (c *tagCache) loadTypeIndex(tagType models.TagType, db *gorm.DB) ([]*models
 		return nil, err
 	}
 
-	// 从缓存获取（如果缓存未命中，查询数据库并设置缓存）
-	result := make([]*models.Tag, 0, len(tags))
+	// 直接使用查询结果，避免重复查询数据库
+	result := make([]*models.Tag, len(tags))
 	for i := range tags {
-		tag, err := c.Get(tagType, tags[i].Value, db)
-		if err != nil {
-			// 如果查询失败，跳过该标签（可能是数据不一致）
-			continue
+		// 设置到缓存（如果缓存可用）
+		if c.cache != nil {
+			key := cacheKey(tagType, tags[i].Value)
+			c.cache.Set(key, &tags[i], 1)
 		}
-		result = append(result, tag)
+		result[i] = &tags[i]
 	}
 
 	// 更新索引（即使为空也要设置，避免重复查询）

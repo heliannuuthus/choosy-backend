@@ -5,6 +5,7 @@ import (
 	"choosy-backend/internal/tag"
 
 	"gorm.io/gorm"
+	"sync"
 )
 
 // Service 用户偏好服务
@@ -28,22 +29,39 @@ func (s *Service) GetDB() *gorm.DB {
 
 // GetOptions 获取所有偏好选项（从缓存索引获取，性能最优）
 func (s *Service) GetOptions() (*OptionsResponse, error) {
-	// 获取口味选项
-	flavors, err := s.tagService.GetTagsByType(models.TagTypeFlavor)
-	if err != nil {
-		return nil, err
-	}
+	var flavors, taboos, allergies []models.Tag
+	var flavorsErr, taboosErr, allergiesErr error
+	var wg sync.WaitGroup
 
-	// 获取忌口选项
-	taboos, err := s.tagService.GetTagsByType(models.TagTypeTaboo)
-	if err != nil {
-		return nil, err
-	}
+	// 并行获取三个类型的标签
+	wg.Add(3)
 
-	// 获取过敏选项
-	allergies, err := s.tagService.GetTagsByType(models.TagTypeAllergy)
-	if err != nil {
-		return nil, err
+	go func() {
+		defer wg.Done()
+		flavors, flavorsErr = s.tagService.GetTagsByType(models.TagTypeFlavor)
+	}()
+
+	go func() {
+		defer wg.Done()
+		taboos, taboosErr = s.tagService.GetTagsByType(models.TagTypeTaboo)
+	}()
+
+	go func() {
+		defer wg.Done()
+		allergies, allergiesErr = s.tagService.GetTagsByType(models.TagTypeAllergy)
+	}()
+
+	wg.Wait()
+
+	// 检查错误
+	if flavorsErr != nil {
+		return nil, flavorsErr
+	}
+	if taboosErr != nil {
+		return nil, taboosErr
+	}
+	if allergiesErr != nil {
+		return nil, allergiesErr
 	}
 
 	return &OptionsResponse{

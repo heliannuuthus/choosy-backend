@@ -632,18 +632,14 @@ func (s *Service) fillTags(recipes []models.Recipe) error {
 		return nil
 	}
 
-	// 2. 从缓存获取标签定义（避免数据库查询）
+	// 2. 从缓存获取标签定义（懒加载：缓存未命中时自动查询数据库）
 	tagCache := tag.GetTagCache()
-	if !tagCache.IsLoaded() {
-		if err := tagCache.Load(s.db); err != nil {
-			return err
-		}
-	}
 
 	// 3. 按 recipe_id 分组组装（从缓存获取标签定义）
 	recipeTagsMap := make(map[string][]models.Tag)
 	for _, rt := range recipeTags {
-		if tag, ok := tagCache.Get(rt.TagType, rt.TagValue); ok {
+		tag, err := tagCache.Get(rt.TagType, rt.TagValue, s.db)
+		if err == nil {
 			recipeTagsMap[rt.RecipeID] = append(recipeTagsMap[rt.RecipeID], *tag)
 		}
 	}
