@@ -42,6 +42,16 @@ api-key = ""  # 高德地图 Web 服务 API Key
 appid = ""  # 微信小程序 AppID
 secret = ""  # 微信小程序 Secret
 
+# 抖音小程序配置 (https://developer.open-douyin.com/)
+[idps.tt]
+appid = ""  # 抖音小程序 AppID
+secret = ""  # 抖音小程序 Secret
+
+# 支付宝小程序配置 (https://open.alipay.com/)
+[idps.alipay]
+appid = ""  # 支付宝小程序 AppID
+secret = ""  # 支付宝小程序 Secret（实际是应用私钥，需要 RSA 签名）
+
 # 认证配置
 [auth]
 issuer = "choosy.heliannuuthus.com"

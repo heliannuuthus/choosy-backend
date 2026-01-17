@@ -41,13 +41,32 @@ type WxCode2SessionResponse struct {
 	ErrMsg     string `json:"errmsg,omitempty"`
 }
 
+// TtCode2SessionResponse TT code2session 响应
+type TtCode2SessionResponse struct {
+	OpenID     string `json:"openid"`
+	SessionKey string `json:"session_key"`
+	UnionID    string `json:"unionid,omitempty"`
+	ErrCode    int    `json:"errcode,omitempty"`
+	ErrMsg     string `json:"errmsg,omitempty"`
+}
+
+// AlipayCode2SessionResponse 支付宝 code2session 响应
+type AlipayCode2SessionResponse struct {
+	OpenID     string `json:"openid"`
+	SessionKey string `json:"session_key"`
+	UnionID    string `json:"unionid,omitempty"`
+	ErrCode    string `json:"code,omitempty"`    // 支付宝使用 code 字段表示错误码
+	ErrMsg     string `json:"msg,omitempty"`     // 支付宝使用 msg 字段表示错误信息
+	SubMsg     string `json:"sub_msg,omitempty"` // 支付宝子错误信息
+}
+
 // IdP 常量
 const (
 	IDPWechatMP      = "wechat:mp"      // 微信小程序
 	IDPWechatUnionID = "wechat:unionid" // 微信 UnionID
 	IDPWechatOA      = "wechat:oa"      // 微信公众号
-	IDPDouyinMP      = "douyin:mp"      // 抖音小程序
-	IDPDouyinUnionID = "douyin:unionid" // 抖音 UnionID
+	IDPTTMP          = "tt:mp"          // TT 小程序
+	IDPTTUnionID     = "tt:unionid"     // TT UnionID
 	IDPAlipayMP      = "alipay:mp"      // 支付宝小程序
 	IDPAppleSignIn   = "apple:signin"   // Apple 登录
 )

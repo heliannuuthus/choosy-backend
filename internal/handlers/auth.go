@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"choosy-backend/internal/auth"
 	"choosy-backend/internal/config"
@@ -58,7 +59,7 @@ const (
 
 type TokenRequest struct {
 	GrantType    string `form:"grant_type" binding:"required,oneof=authorization_code refresh_token"`
-	Code         string `form:"code"`
+	Code         string `form:"code"` // 格式：idp:code，如 wechat:mp:xxx 或 tt:mp:xxx
 	RefreshToken string `form:"refresh_token"`
 	Nickname     string `form:"nickname"`
 	Avatar       string `form:"avatar"`
@@ -122,40 +123,153 @@ func (h *AuthHandler) handleAuthorizationCode(c *gin.Context, code, nickname, av
 		return
 	}
 
-	appid := config.GetString("idps.wxmp.appid")
-	secret := config.GetString("idps.wxmp.secret")
-	if appid == "" || secret == "" {
-		logger.Error("微信配置缺失: idps.wxmp.appid 或 idps.wxmp.secret 未设置")
-		c.JSON(http.StatusInternalServerError, OAuth2Error{
-			Error:            "server_error",
-			ErrorDescription: "服务器配置错误",
-		})
-		return
-	}
-
-	wxResult, err := h.service.WxCode2Session(code)
-	if err != nil {
-		logger.Errorf("微信登录失败: %v", err)
+	// 解析 code，格式：idp:actual_code，如 wechat:mp:xxx 或 tt:mp:xxx
+	// 所有平台都必须显式指定 idp，不区分对待
+	parts := strings.SplitN(code, ":", 3)
+	if len(parts) < 3 {
 		c.JSON(http.StatusBadRequest, OAuth2Error{
-			Error:            "invalid_grant",
-			ErrorDescription: err.Error(),
+			Error:            "invalid_request",
+			ErrorDescription: "code format must be idp:actual_code (e.g., wechat:mp:xxx, tt:mp:xxx)",
 		})
 		return
 	}
 
-	if nickname == "" {
-		nickname = generateRandomNickname()
-	}
-	if avatar == "" {
-		avatar = generateRandomAvatar(wxResult.OpenID)
+	idp := parts[0] + ":" + parts[1]
+	actualCode := parts[2]
+
+	// 验证 idp 是否支持
+	if idp != auth.IDPWechatMP && idp != auth.IDPTTMP && idp != auth.IDPAlipayMP {
+		c.JSON(http.StatusBadRequest, OAuth2Error{
+			Error:            "unsupported_idp",
+			ErrorDescription: fmt.Sprintf("不支持的平台: %s，支持的平台: %s, %s, %s", idp, auth.IDPWechatMP, auth.IDPTTMP, auth.IDPAlipayMP),
+		})
+		return
 	}
 
-	tokens, err := h.service.GenerateToken(wxResult, nickname, avatar)
-	if err != nil {
-		logger.Errorf("生成 token 失败: %v", err)
-		c.JSON(http.StatusInternalServerError, OAuth2Error{
-			Error:            "server_error",
-			ErrorDescription: "生成 token 失败",
+	var tokens *auth.TokenPair
+
+	switch idp {
+	case auth.IDPWechatMP:
+		appid := config.GetString("idps.wxmp.appid")
+		secret := config.GetString("idps.wxmp.secret")
+		if appid == "" || secret == "" {
+			logger.Error("微信配置缺失: idps.wxmp.appid 或 idps.wxmp.secret 未设置")
+			c.JSON(http.StatusInternalServerError, OAuth2Error{
+				Error:            "server_error",
+				ErrorDescription: "微信小程序配置缺失",
+			})
+			return
+		}
+
+		wxResult, err := h.service.WxCode2Session(actualCode)
+		if err != nil {
+			logger.Errorf("微信登录失败: %v", err)
+			c.JSON(http.StatusBadRequest, OAuth2Error{
+				Error:            "invalid_grant",
+				ErrorDescription: err.Error(),
+			})
+			return
+		}
+
+		if nickname == "" {
+			nickname = generateRandomNickname()
+		}
+		if avatar == "" {
+			avatar = generateRandomAvatar(wxResult.OpenID)
+		}
+
+		tokens, err = h.service.GenerateToken(wxResult, nickname, avatar)
+		if err != nil {
+			logger.Errorf("生成 token 失败: %v", err)
+			c.JSON(http.StatusInternalServerError, OAuth2Error{
+				Error:            "server_error",
+				ErrorDescription: "生成 token 失败",
+			})
+			return
+		}
+
+	case auth.IDPTTMP:
+		appid := config.GetString("idps.tt.appid")
+		secret := config.GetString("idps.tt.secret")
+		if appid == "" || secret == "" {
+			logger.Error("TT 配置缺失: idps.tt.appid 或 idps.tt.secret 未设置")
+			c.JSON(http.StatusInternalServerError, OAuth2Error{
+				Error:            "server_error",
+				ErrorDescription: "TT 小程序配置缺失",
+			})
+			return
+		}
+
+		ttResult, err := h.service.TtCode2Session(actualCode)
+		if err != nil {
+			logger.Errorf("TT 登录失败: %v", err)
+			c.JSON(http.StatusBadRequest, OAuth2Error{
+				Error:            "invalid_grant",
+				ErrorDescription: err.Error(),
+			})
+			return
+		}
+
+		if nickname == "" {
+			nickname = generateRandomNickname()
+		}
+		if avatar == "" {
+			avatar = generateRandomAvatar(ttResult.OpenID)
+		}
+
+		tokens, err = h.service.GenerateTokenFromTt(ttResult, nickname, avatar)
+		if err != nil {
+			logger.Errorf("生成 token 失败: %v", err)
+			c.JSON(http.StatusInternalServerError, OAuth2Error{
+				Error:            "server_error",
+				ErrorDescription: "生成 token 失败",
+			})
+			return
+		}
+
+	case auth.IDPAlipayMP:
+		appid := config.GetString("idps.alipay.appid")
+		secret := config.GetString("idps.alipay.secret")
+		if appid == "" || secret == "" {
+			logger.Error("支付宝配置缺失: idps.alipay.appid 或 idps.alipay.secret 未设置")
+			c.JSON(http.StatusInternalServerError, OAuth2Error{
+				Error:            "server_error",
+				ErrorDescription: "支付宝小程序配置缺失",
+			})
+			return
+		}
+
+		alipayResult, err := h.service.AlipayCode2Session(actualCode)
+		if err != nil {
+			logger.Errorf("支付宝登录失败: %v", err)
+			c.JSON(http.StatusBadRequest, OAuth2Error{
+				Error:            "invalid_grant",
+				ErrorDescription: err.Error(),
+			})
+			return
+		}
+
+		if nickname == "" {
+			nickname = generateRandomNickname()
+		}
+		if avatar == "" {
+			avatar = generateRandomAvatar(alipayResult.OpenID)
+		}
+
+		tokens, err = h.service.GenerateTokenFromAlipay(alipayResult, nickname, avatar)
+		if err != nil {
+			logger.Errorf("生成 token 失败: %v", err)
+			c.JSON(http.StatusInternalServerError, OAuth2Error{
+				Error:            "server_error",
+				ErrorDescription: "生成 token 失败",
+			})
+			return
+		}
+
+	default:
+		c.JSON(http.StatusBadRequest, OAuth2Error{
+			Error:            "unsupported_idp",
+			ErrorDescription: fmt.Sprintf("不支持的平台: %s", idp),
 		})
 		return
 	}

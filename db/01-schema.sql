@@ -26,7 +26,7 @@ CREATE INDEX IF NOT EXISTS idx_t_user_phone ON t_user(phone);  -- 改为普通�
 CREATE TABLE IF NOT EXISTS t_user_identity (
     _id         INTEGER PRIMARY KEY AUTOINCREMENT,
     openid      VARCHAR(64) NOT NULL,           -- 关联 t_user.openid
-    idp         VARCHAR(64) NOT NULL,           -- 身份提供方，格式 provider:namespace（如 wechat:mp / douyin:mp / wechat:unionid）
+    idp         VARCHAR(64) NOT NULL,           -- 身份提供方，格式 provider:namespace（如 wechat:mp / tt:mp / wechat:unionid）
     t_openid    VARCHAR(128) NOT NULL,          -- 第三方原始标识
     raw_data    TEXT,                           -- 原始授权数据 JSON（可选）
     created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
