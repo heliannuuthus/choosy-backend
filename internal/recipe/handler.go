@@ -82,8 +82,6 @@ type RecipeUpdateRequest struct {
 	AdditionalNotes  *[]string            `json:"additional_notes"`
 }
 
-
-
 type RecipeResponse struct {
 	ID               string               `json:"id"`
 	Name             string               `json:"name"`
@@ -92,7 +90,7 @@ type RecipeResponse struct {
 	ImagePath        *string              `json:"image_path"`
 	Category         string               `json:"category"`
 	Difficulty       int                  `json:"difficulty"`
-	Tags             types.TagsGrouped `json:"tags"`
+	Tags             types.TagsGrouped    `json:"tags"`
 	Servings         int                  `json:"servings"`
 	PrepTimeMinutes  *int                 `json:"prep_time_minutes"`
 	CookTimeMinutes  *int                 `json:"cook_time_minutes"`
@@ -484,7 +482,6 @@ func (h *Handler) CreateRecipesBatch(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, responses)
 }
-
 
 func (h *Handler) toRecipeResponse(r *models.Recipe) *RecipeResponse {
 	if r == nil {

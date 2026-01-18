@@ -33,8 +33,8 @@ type FavoriteResponse struct {
 }
 
 type FavoriteListItem struct {
-	RecipeID  string                  `json:"recipe_id"`
-	CreatedAt string                  `json:"created_at"`
+	RecipeID  string                `json:"recipe_id"`
+	CreatedAt string                `json:"created_at"`
 	Recipe    *types.RecipeListItem `json:"recipe,omitempty"`
 }
 

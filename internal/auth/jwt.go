@@ -210,7 +210,6 @@ func CreateAccessToken(identity *Identity, idp string) (string, error) {
 	return string(encryptedToken), nil
 }
 
-
 // VerifyAccessToken 验证 access_token 并解密身份信息
 func VerifyAccessToken(tokenString string) (*Identity, error) {
 	logger.Infof("[Auth] 开始验证 Token - Size: %d bytes", len(tokenString))

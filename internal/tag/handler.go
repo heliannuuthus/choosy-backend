@@ -84,7 +84,7 @@ func (h *Handler) ListTags(c *gin.Context) {
 
 	response := make([]TagValueResponse, len(results))
 	for i, r := range results {
-		response[i] = TagValueResponse{Value: r.Value, Label: r.Label}
+		response[i] = TagValueResponse(r)
 	}
 	c.JSON(http.StatusOK, response)
 }
@@ -125,7 +125,7 @@ func (h *Handler) GetTagsByType(c *gin.Context) {
 
 	response := make([]TagValueResponse, len(results))
 	for i, r := range results {
-		response[i] = TagValueResponse{Value: r.Value, Label: r.Label}
+		response[i] = TagValueResponse(r)
 	}
 	c.JSON(http.StatusOK, response)
 }
@@ -333,7 +333,7 @@ func (h *Handler) GetCuisines(c *gin.Context) {
 
 	response := make([]TagValueResponse, len(results))
 	for i, r := range results {
-		response[i] = TagValueResponse{Value: r.Value, Label: r.Label}
+		response[i] = TagValueResponse(r)
 	}
 	c.JSON(http.StatusOK, response)
 }
@@ -354,7 +354,7 @@ func (h *Handler) GetFlavors(c *gin.Context) {
 
 	response := make([]TagValueResponse, len(results))
 	for i, r := range results {
-		response[i] = TagValueResponse{Value: r.Value, Label: r.Label}
+		response[i] = TagValueResponse(r)
 	}
 	c.JSON(http.StatusOK, response)
 }
@@ -375,7 +375,7 @@ func (h *Handler) GetScenes(c *gin.Context) {
 
 	response := make([]TagValueResponse, len(results))
 	for i, r := range results {
-		response[i] = TagValueResponse{Value: r.Value, Label: r.Label}
+		response[i] = TagValueResponse(r)
 	}
 	c.JSON(http.StatusOK, response)
 }

@@ -152,7 +152,6 @@ type LocationInfo struct {
 	Adcode   string `json:"-"`
 }
 
-
 // TimeInfo 时间信息
 type TimeInfo struct {
 	Timestamp int64  `json:"timestamp"`

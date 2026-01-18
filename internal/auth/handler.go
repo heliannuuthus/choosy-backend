@@ -383,30 +383,6 @@ func (h *Handler) GetStats(c *gin.Context) {
 	})
 }
 
-// getIDPFromUser 从用户身份表获取 idp
-func (h *Handler) getIDPFromUser(openid string) string {
-	var identity models.UserIdentity
-	err := h.db.Where("openid = ? AND idp NOT LIKE ?", openid, "%:unionid").First(&identity).Error
-	if err == nil {
-		return identity.IDP
-	}
-	err = h.db.Where("openid = ?", openid).First(&identity).Error
-	if err == nil {
-		if strings.Contains(identity.IDP, ":unionid") {
-			parts := strings.Split(identity.IDP, ":")
-			if len(parts) >= 2 {
-				provider := parts[0]
-				var mainIdentity models.UserIdentity
-				if err := h.db.Where("openid = ? AND idp LIKE ?", openid, provider+":%").First(&mainIdentity).Error; err == nil {
-					return mainIdentity.IDP
-				}
-			}
-		}
-		return identity.IDP
-	}
-	return IDPWechatMP
-}
-
 type IdpProfileRequest struct {
 	PhoneCode string `json:"phone_code"`
 }
