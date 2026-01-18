@@ -1,25 +1,26 @@
-package handlers
+package home
 
 import (
 	"math/rand"
 	"net/http"
 	"strconv"
 
-	"choosy-backend/internal/config"
-	"choosy-backend/internal/recipe"
+	"zwei-backend/internal/config"
+	"zwei-backend/internal/recipe"
+	"zwei-backend/internal/types"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-// HomeHandler 首页处理器
-type HomeHandler struct {
+// Handler 首页处理器
+type Handler struct {
 	recipeService *recipe.Service
 }
 
-// NewHomeHandler 创建首页处理器
-func NewHomeHandler(db *gorm.DB) *HomeHandler {
-	return &HomeHandler{
+// NewHandler 创建首页处理器
+func NewHandler(db *gorm.DB) *Handler {
+	return &Handler{
 		recipeService: recipe.NewService(db),
 	}
 }
@@ -38,7 +39,7 @@ type BannerItem struct {
 // @Produce json
 // @Success 200 {array} BannerItem
 // @Router /api/home/banners [get]
-func (h *HomeHandler) GetBanners(c *gin.Context) {
+func (h *Handler) GetBanners(c *gin.Context) {
 	banners := h.loadBannersFromConfig()
 	c.JSON(http.StatusOK, banners)
 }
@@ -48,9 +49,9 @@ func (h *HomeHandler) GetBanners(c *gin.Context) {
 // @Tags home
 // @Produce json
 // @Param limit query int false "数量限制" default(4)
-// @Success 200 {array} RecipeListItem
+// @Success 200 {array} types.RecipeListItem
 // @Router /api/home/recommend [get]
-func (h *HomeHandler) GetRecommendRecipes(c *gin.Context) {
+func (h *Handler) GetRecommendRecipes(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "4"))
 	if limit < 1 {
 		limit = 1
@@ -67,9 +68,9 @@ func (h *HomeHandler) GetRecommendRecipes(c *gin.Context) {
 // @Tags home
 // @Produce json
 // @Param limit query int false "数量限制" default(6)
-// @Success 200 {array} RecipeListItem
+// @Success 200 {array} types.RecipeListItem
 // @Router /api/home/hot [get]
-func (h *HomeHandler) GetHotRecipes(c *gin.Context) {
+func (h *Handler) GetHotRecipes(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "6"))
 	if limit < 1 {
 		limit = 1
@@ -81,7 +82,7 @@ func (h *HomeHandler) GetHotRecipes(c *gin.Context) {
 	c.JSON(http.StatusOK, recipes)
 }
 
-func (h *HomeHandler) loadBannersFromConfig() []BannerItem {
+func (h *Handler) loadBannersFromConfig() []BannerItem {
 	var banners []BannerItem
 
 	bannersConfig := config.Get("home.banners")
@@ -136,21 +137,21 @@ func generateBannerID(index int) string {
 	return "banner_" + string(rune('a'+index))
 }
 
-func (h *HomeHandler) getHotRecipes(count int) []RecipeListItem {
+func (h *Handler) getHotRecipes(count int) []types.RecipeListItem {
 	recipes, _ := h.recipeService.GetHotRecipes(count, nil)
 	if len(recipes) == 0 {
-		return []RecipeListItem{}
+		return []types.RecipeListItem{}
 	}
 
-	items := make([]RecipeListItem, len(recipes))
+	items := make([]types.RecipeListItem, len(recipes))
 	for i, r := range recipes {
-		items[i] = RecipeListItem{
+		items[i] = types.RecipeListItem{
 			ID:               r.RecipeID,
 			Name:             r.Name,
 			Description:      r.Description,
 			Category:         r.Category,
 			Difficulty:       r.Difficulty,
-			Tags:             GroupTags(r.Tags),
+			Tags:             types.GroupTags(r.Tags),
 			ImagePath:        r.GetImagePath(),
 			TotalTimeMinutes: r.TotalTimeMinutes,
 		}
@@ -159,21 +160,21 @@ func (h *HomeHandler) getHotRecipes(count int) []RecipeListItem {
 	return items
 }
 
-func (h *HomeHandler) getRandomRecipes(count int) []RecipeListItem {
+func (h *Handler) getRandomRecipes(count int) []types.RecipeListItem {
 	recipes, _ := h.recipeService.GetRecipes("", "", 100, 0)
 	if len(recipes) == 0 {
-		return []RecipeListItem{}
+		return []types.RecipeListItem{}
 	}
 
-	var items []RecipeListItem
+	var items []types.RecipeListItem
 	for _, r := range recipes {
-		items = append(items, RecipeListItem{
+		items = append(items, types.RecipeListItem{
 			ID:               r.RecipeID,
 			Name:             r.Name,
 			Description:      r.Description,
 			Category:         r.Category,
 			Difficulty:       r.Difficulty,
-			Tags:             GroupTags(r.Tags),
+			Tags:             types.GroupTags(r.Tags),
 			ImagePath:        r.GetImagePath(),
 			TotalTimeMinutes: r.TotalTimeMinutes,
 		})

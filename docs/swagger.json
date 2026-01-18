@@ -9,54 +9,6 @@
     "host": "localhost:18000",
     "basePath": "/api",
     "paths": {
-        "/api/context": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "根据经纬度获取位置、天气、时间信息",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "context"
-                ],
-                "summary": "获取推荐上下文",
-                "parameters": [
-                    {
-                        "description": "上下文请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ContextRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ContextResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/api/home/banners": {
             "get": {
                 "produces": [
@@ -72,7 +24,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.BannerItem"
+                                "$ref": "#/definitions/home.BannerItem"
                             }
                         }
                     }
@@ -103,7 +55,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.RecipeListItem"
+                                "$ref": "#/definitions/types.RecipeListItem"
                             }
                         }
                     }
@@ -134,7 +86,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.RecipeListItem"
+                                "$ref": "#/definitions/types.RecipeListItem"
                             }
                         }
                     }
@@ -213,7 +165,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.RecipeListItem"
+                                "$ref": "#/definitions/types.RecipeListItem"
                             }
                         }
                     }
@@ -237,7 +189,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.RecipeCreateRequest"
+                            "$ref": "#/definitions/recipe.RecipeCreateRequest"
                         }
                     }
                 ],
@@ -245,7 +197,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handlers.RecipeResponse"
+                            "$ref": "#/definitions/recipe.RecipeResponse"
                         }
                     },
                     "400": {
@@ -281,7 +233,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.RecipeCreateRequest"
+                                "$ref": "#/definitions/recipe.RecipeCreateRequest"
                             }
                         }
                     }
@@ -292,7 +244,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.RecipeResponse"
+                                "$ref": "#/definitions/recipe.RecipeResponse"
                             }
                         }
                     }
@@ -314,7 +266,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.CategoryResponse"
+                                "$ref": "#/definitions/recipe.CategoryResponse"
                             }
                         }
                     }
@@ -343,7 +295,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.RecipeResponse"
+                            "$ref": "#/definitions/recipe.RecipeResponse"
                         }
                     },
                     "404": {
@@ -382,7 +334,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.RecipeUpdateRequest"
+                            "$ref": "#/definitions/recipe.RecipeUpdateRequest"
                         }
                     }
                 ],
@@ -390,7 +342,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.RecipeResponse"
+                            "$ref": "#/definitions/recipe.RecipeResponse"
                         }
                     },
                     "404": {
@@ -454,7 +406,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.RecommendRequest"
+                            "$ref": "#/definitions/recommend.RecommendRequest"
                         }
                     },
                     {
@@ -469,7 +421,55 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.RecommendResponse"
+                            "$ref": "#/definitions/recommend.RecommendResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/recommend/context": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "根据经纬度获取位置、天气、时间信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "recommend"
+                ],
+                "summary": "获取推荐上下文",
+                "parameters": [
+                    {
+                        "description": "上下文请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/recommend.ContextRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/recommend.ContextResponse"
                         }
                     },
                     "400": {
@@ -518,7 +518,7 @@
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/handlers.OAuth2Error"
+                            "$ref": "#/definitions/auth.OAuth2Error"
                         }
                     }
                 }
@@ -582,7 +582,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.StatsResponse"
+                            "$ref": "#/definitions/auth.StatsResponse"
                         }
                     },
                     "401": {
@@ -627,7 +627,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.TagValueResponse"
+                                "$ref": "#/definitions/tag.TagValueResponse"
                             }
                         }
                     }
@@ -652,7 +652,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.CreateTagRequest"
+                            "$ref": "#/definitions/tag.CreateTagRequest"
                         }
                     }
                 ],
@@ -660,7 +660,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handlers.TagValueResponse"
+                            "$ref": "#/definitions/tag.TagValueResponse"
                         }
                     },
                     "400": {
@@ -691,7 +691,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.TagValueResponse"
+                                "$ref": "#/definitions/tag.TagValueResponse"
                             }
                         }
                     }
@@ -714,7 +714,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.TagValueResponse"
+                                "$ref": "#/definitions/tag.TagValueResponse"
                             }
                         }
                     }
@@ -737,7 +737,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.TagValueResponse"
+                                "$ref": "#/definitions/tag.TagValueResponse"
                             }
                         }
                     }
@@ -769,7 +769,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.TagValueResponse"
+                                "$ref": "#/definitions/tag.TagValueResponse"
                             }
                         }
                     }
@@ -816,7 +816,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.UpdateTagRequest"
+                            "$ref": "#/definitions/tag.UpdateTagRequest"
                         }
                     }
                 ],
@@ -824,7 +824,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.TagValueResponse"
+                            "$ref": "#/definitions/tag.TagValueResponse"
                         }
                     },
                     "400": {
@@ -924,25 +924,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.TokenResponse"
+                            "$ref": "#/definitions/auth.TokenResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/handlers.OAuth2Error"
+                            "$ref": "#/definitions/auth.OAuth2Error"
                         }
                     },
                     "412": {
                         "description": "refresh_token 无效或已过期",
                         "schema": {
-                            "$ref": "#/definitions/handlers.OAuth2Error"
+                            "$ref": "#/definitions/auth.OAuth2Error"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/handlers.OAuth2Error"
+                            "$ref": "#/definitions/auth.OAuth2Error"
                         }
                     }
                 }
@@ -990,7 +990,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.UploadImageResponse"
+                            "$ref": "#/definitions/upload.UploadImageResponse"
                         }
                     },
                     "400": {
@@ -1064,7 +1064,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.FavoriteListResponse"
+                            "$ref": "#/definitions/favorite.FavoriteListResponse"
                         }
                     },
                     "401": {
@@ -1096,7 +1096,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.FavoriteRequest"
+                            "$ref": "#/definitions/favorite.FavoriteRequest"
                         }
                     }
                 ],
@@ -1104,7 +1104,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handlers.FavoriteResponse"
+                            "$ref": "#/definitions/favorite.FavoriteResponse"
                         }
                     },
                     "400": {
@@ -1147,7 +1147,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.BatchCheckRequest"
+                            "$ref": "#/definitions/favorite.BatchCheckRequest"
                         }
                     }
                 ],
@@ -1155,7 +1155,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.BatchCheckResponse"
+                            "$ref": "#/definitions/favorite.BatchCheckResponse"
                         }
                     },
                     "401": {
@@ -1223,7 +1223,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.CheckFavoriteResponse"
+                            "$ref": "#/definitions/favorite.CheckFavoriteResponse"
                         }
                     },
                     "401": {
@@ -1279,7 +1279,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.HistoryListResponse"
+                            "$ref": "#/definitions/history.HistoryListResponse"
                         }
                     },
                     "401": {
@@ -1311,7 +1311,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.HistoryRequest"
+                            "$ref": "#/definitions/history.HistoryRequest"
                         }
                     }
                 ],
@@ -1319,7 +1319,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handlers.HistoryResponse"
+                            "$ref": "#/definitions/history.HistoryResponse"
                         }
                     },
                     "400": {
@@ -1522,7 +1522,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.UserProfile"
+                            "$ref": "#/definitions/auth.UserProfile"
                         }
                     },
                     "401": {
@@ -1568,7 +1568,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.UpdateProfileRequest"
+                            "$ref": "#/definitions/auth.UpdateProfileRequest"
                         }
                     }
                 ],
@@ -1576,7 +1576,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.UserProfile"
+                            "$ref": "#/definitions/auth.UserProfile"
                         }
                     },
                     "400": {
@@ -1608,296 +1608,92 @@
                     }
                 }
             }
+        },
+        "/api/{idp}/profile": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "更新平台相关用户信息",
+                "parameters": [
+                    {
+                        "enum": [
+                            "wechat:mp",
+                            "tt:mp",
+                            "alipay:mp"
+                        ],
+                        "type": "string",
+                        "description": "身份提供方",
+                        "name": "idp",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "更新请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.IdpProfileRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/auth.UserProfile"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/auth.OAuth2Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
-        "handlers.BannerItem": {
+        "auth.IdpProfileRequest": {
             "type": "object",
             "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "image_url": {
-                    "type": "string"
-                },
-                "link": {
-                    "type": "string"
-                },
-                "link_type": {
-                    "type": "string"
-                },
-                "title": {
+                "phone_code": {
                     "type": "string"
                 }
             }
         },
-        "handlers.BatchCheckRequest": {
-            "type": "object",
-            "required": [
-                "recipe_ids"
-            ],
-            "properties": {
-                "recipe_ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "handlers.BatchCheckResponse": {
-            "type": "object",
-            "properties": {
-                "favorited_ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "handlers.CategoryResponse": {
-            "type": "object",
-            "properties": {
-                "key": {
-                    "type": "string"
-                },
-                "label": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.CheckFavoriteResponse": {
-            "type": "object",
-            "properties": {
-                "is_favorite": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "handlers.ContextRequest": {
-            "type": "object",
-            "required": [
-                "latitude",
-                "longitude"
-            ],
-            "properties": {
-                "latitude": {
-                    "type": "number"
-                },
-                "longitude": {
-                    "type": "number"
-                },
-                "timestamp": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.ContextResponse": {
-            "type": "object",
-            "properties": {
-                "location": {
-                    "$ref": "#/definitions/handlers.LocationInfo"
-                },
-                "time": {
-                    "$ref": "#/definitions/handlers.TimeInfo"
-                },
-                "weather": {
-                    "$ref": "#/definitions/handlers.WeatherInfo"
-                }
-            }
-        },
-        "handlers.CreateTagRequest": {
-            "type": "object",
-            "required": [
-                "label",
-                "type",
-                "value"
-            ],
-            "properties": {
-                "label": {
-                    "description": "显示名称",
-                    "type": "string"
-                },
-                "recipe_id": {
-                    "description": "菜谱ID（可选，为空时创建选项）",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "标签类型",
-                    "type": "string"
-                },
-                "value": {
-                    "description": "标签值",
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.FavoriteListItem": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "recipe": {
-                    "$ref": "#/definitions/handlers.RecipeListItem"
-                },
-                "recipe_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.FavoriteListResponse": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handlers.FavoriteListItem"
-                    }
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.FavoriteRequest": {
-            "type": "object",
-            "required": [
-                "recipe_id"
-            ],
-            "properties": {
-                "recipe_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.FavoriteResponse": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "recipe_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.HistoryListItem": {
-            "type": "object",
-            "properties": {
-                "recipe": {
-                    "$ref": "#/definitions/handlers.RecipeListItem"
-                },
-                "recipe_id": {
-                    "type": "string"
-                },
-                "viewed_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.HistoryListResponse": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handlers.HistoryListItem"
-                    }
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.HistoryRequest": {
-            "type": "object",
-            "required": [
-                "recipe_id"
-            ],
-            "properties": {
-                "recipe_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.HistoryResponse": {
-            "type": "object",
-            "properties": {
-                "recipe_id": {
-                    "type": "string"
-                },
-                "viewed_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.IngredientRequest": {
-            "type": "object",
-            "required": [
-                "name",
-                "text_quantity"
-            ],
-            "properties": {
-                "name": {
-                    "type": "string"
-                },
-                "notes": {
-                    "type": "string"
-                },
-                "quantity": {
-                    "type": "number"
-                },
-                "text_quantity": {
-                    "type": "string"
-                },
-                "unit": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.IngredientResponse": {
-            "type": "object",
-            "properties": {
-                "category": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "notes": {
-                    "type": "string"
-                },
-                "quantity": {
-                    "type": "number"
-                },
-                "text_quantity": {
-                    "type": "string"
-                },
-                "unit": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.LocationInfo": {
-            "type": "object",
-            "properties": {
-                "city": {
-                    "type": "string"
-                },
-                "district": {
-                    "type": "string"
-                },
-                "province": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.OAuth2Error": {
+        "auth.OAuth2Error": {
             "type": "object",
             "properties": {
                 "error": {
@@ -1908,398 +1704,18 @@
                 }
             }
         },
-        "handlers.RecipeCreateRequest": {
-            "type": "object",
-            "required": [
-                "category",
-                "difficulty",
-                "name",
-                "servings"
-            ],
-            "properties": {
-                "additional_notes": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "category": {
-                    "type": "string"
-                },
-                "cook_time_minutes": {
-                    "type": "integer"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "difficulty": {
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "images": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "ingredients": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handlers.IngredientRequest"
-                    }
-                },
-                "name": {
-                    "type": "string"
-                },
-                "prep_time_minutes": {
-                    "type": "integer"
-                },
-                "servings": {
-                    "type": "integer"
-                },
-                "steps": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handlers.StepRequest"
-                    }
-                },
-                "tags": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "total_time_minutes": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.RecipeListItem": {
-            "type": "object",
-            "properties": {
-                "category": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "difficulty": {
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "image_path": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "tags": {
-                    "$ref": "#/definitions/handlers.TagsGrouped"
-                },
-                "total_time_minutes": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.RecipeResponse": {
-            "type": "object",
-            "properties": {
-                "additional_notes": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "category": {
-                    "type": "string"
-                },
-                "cook_time_minutes": {
-                    "type": "integer"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "difficulty": {
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "image_path": {
-                    "type": "string"
-                },
-                "images": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "ingredients": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handlers.IngredientResponse"
-                    }
-                },
-                "name": {
-                    "type": "string"
-                },
-                "prep_time_minutes": {
-                    "type": "integer"
-                },
-                "servings": {
-                    "type": "integer"
-                },
-                "steps": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handlers.StepResponse"
-                    }
-                },
-                "tags": {
-                    "$ref": "#/definitions/handlers.TagsGrouped"
-                },
-                "total_time_minutes": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.RecipeUpdateRequest": {
-            "type": "object",
-            "properties": {
-                "additional_notes": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "category": {
-                    "type": "string"
-                },
-                "cook_time_minutes": {
-                    "type": "integer"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "difficulty": {
-                    "type": "integer"
-                },
-                "images": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "ingredients": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handlers.IngredientRequest"
-                    }
-                },
-                "name": {
-                    "type": "string"
-                },
-                "prep_time_minutes": {
-                    "type": "integer"
-                },
-                "servings": {
-                    "type": "integer"
-                },
-                "steps": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handlers.StepRequest"
-                    }
-                },
-                "tags": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "total_time_minutes": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.RecommendRecipeItem": {
-            "type": "object",
-            "properties": {
-                "category": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "difficulty": {
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "image_path": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "reason": {
-                    "description": "该菜品的推荐理由",
-                    "type": "string"
-                },
-                "tags": {
-                    "$ref": "#/definitions/handlers.TagsGrouped"
-                },
-                "total_time_minutes": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.RecommendRequest": {
-            "type": "object",
-            "required": [
-                "latitude",
-                "longitude"
-            ],
-            "properties": {
-                "exclude_ids": {
-                    "description": "排除的菜谱 ID（换一批时传入已推荐的）",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "latitude": {
-                    "type": "number"
-                },
-                "longitude": {
-                    "type": "number"
-                },
-                "timestamp": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.RecommendResponse": {
-            "type": "object",
-            "properties": {
-                "recipes": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handlers.RecommendRecipeItem"
-                    }
-                },
-                "remaining": {
-                    "description": "今日剩余推荐次数",
-                    "type": "integer"
-                },
-                "summary": {
-                    "description": "LLM 生成的一句话整体评价",
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.StatsResponse": {
+        "auth.StatsResponse": {
             "type": "object",
             "properties": {
                 "favorites": {
-                    "description": "收藏数",
                     "type": "integer"
                 },
                 "history": {
-                    "description": "浏览历史数",
                     "type": "integer"
                 }
             }
         },
-        "handlers.StepRequest": {
-            "type": "object",
-            "required": [
-                "description",
-                "step"
-            ],
-            "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "step": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.StepResponse": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "step": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.TagValueResponse": {
-            "type": "object",
-            "properties": {
-                "label": {
-                    "type": "string"
-                },
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.TagsGrouped": {
-            "type": "object",
-            "properties": {
-                "cuisines": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "flavors": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "scenes": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "handlers.TimeInfo": {
-            "type": "object",
-            "properties": {
-                "day_of_week": {
-                    "type": "integer"
-                },
-                "hour": {
-                    "type": "integer"
-                },
-                "meal_time": {
-                    "type": "string"
-                },
-                "season": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.TokenResponse": {
+        "auth.TokenResponse": {
             "type": "object",
             "properties": {
                 "access_token": {
@@ -2316,11 +1732,10 @@
                 }
             }
         },
-        "handlers.UpdateProfileRequest": {
+        "auth.UpdateProfileRequest": {
             "type": "object",
             "properties": {
                 "avatar": {
-                    "description": "移除 url 验证，允许临时路径或 OSS URL",
                     "type": "string",
                     "maxLength": 512
                 },
@@ -2335,34 +1750,10 @@
                 "nickname": {
                     "type": "string",
                     "maxLength": 64
-                },
-                "phone_code": {
-                    "description": "小程序授权码，用于绑定手机号；传空字符串表示解绑，不传则不处理",
-                    "type": "string"
                 }
             }
         },
-        "handlers.UpdateTagRequest": {
-            "type": "object",
-            "required": [
-                "label"
-            ],
-            "properties": {
-                "label": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.UploadImageResponse": {
-            "type": "object",
-            "properties": {
-                "url": {
-                    "description": "上传后的图片 URL",
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.UserProfile": {
+        "auth.UserProfile": {
             "type": "object",
             "properties": {
                 "avatar": {
@@ -2382,19 +1773,155 @@
                 }
             }
         },
-        "handlers.WeatherInfo": {
+        "favorite.BatchCheckRequest": {
+            "type": "object",
+            "required": [
+                "recipe_ids"
+            ],
+            "properties": {
+                "recipe_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "favorite.BatchCheckResponse": {
             "type": "object",
             "properties": {
-                "humidity": {
-                    "type": "integer"
-                },
-                "icon": {
+                "favorited_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "favorite.CheckFavoriteResponse": {
+            "type": "object",
+            "properties": {
+                "is_favorite": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "favorite.FavoriteListItem": {
+            "type": "object",
+            "properties": {
+                "created_at": {
                     "type": "string"
                 },
-                "temperature": {
-                    "type": "number"
+                "recipe": {
+                    "$ref": "#/definitions/types.RecipeListItem"
                 },
-                "weather": {
+                "recipe_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "favorite.FavoriteListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/favorite.FavoriteListItem"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "favorite.FavoriteRequest": {
+            "type": "object",
+            "required": [
+                "recipe_id"
+            ],
+            "properties": {
+                "recipe_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "favorite.FavoriteResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "recipe_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "history.HistoryListItem": {
+            "type": "object",
+            "properties": {
+                "recipe": {
+                    "$ref": "#/definitions/types.RecipeListItem"
+                },
+                "recipe_id": {
+                    "type": "string"
+                },
+                "viewed_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "history.HistoryListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/history.HistoryListItem"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "history.HistoryRequest": {
+            "type": "object",
+            "required": [
+                "recipe_id"
+            ],
+            "properties": {
+                "recipe_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "history.HistoryResponse": {
+            "type": "object",
+            "properties": {
+                "recipe_id": {
+                    "type": "string"
+                },
+                "viewed_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "home.BannerItem": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "link": {
+                    "type": "string"
+                },
+                "link_type": {
+                    "type": "string"
+                },
+                "title": {
                     "type": "string"
                 }
             }
@@ -2504,6 +2031,554 @@
                     "items": {
                         "$ref": "#/definitions/preference.OptionItemWithSelected"
                     }
+                }
+            }
+        },
+        "recipe.CategoryResponse": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                }
+            }
+        },
+        "recipe.IngredientRequest": {
+            "type": "object",
+            "required": [
+                "name",
+                "text_quantity"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "number"
+                },
+                "text_quantity": {
+                    "type": "string"
+                },
+                "unit": {
+                    "type": "string"
+                }
+            }
+        },
+        "recipe.IngredientResponse": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "number"
+                },
+                "text_quantity": {
+                    "type": "string"
+                },
+                "unit": {
+                    "type": "string"
+                }
+            }
+        },
+        "recipe.RecipeCreateRequest": {
+            "type": "object",
+            "required": [
+                "category",
+                "difficulty",
+                "name",
+                "servings"
+            ],
+            "properties": {
+                "additional_notes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "category": {
+                    "type": "string"
+                },
+                "cook_time_minutes": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "difficulty": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ingredients": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/recipe.IngredientRequest"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "prep_time_minutes": {
+                    "type": "integer"
+                },
+                "servings": {
+                    "type": "integer"
+                },
+                "steps": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/recipe.StepRequest"
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "total_time_minutes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "recipe.RecipeResponse": {
+            "type": "object",
+            "properties": {
+                "additional_notes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "category": {
+                    "type": "string"
+                },
+                "cook_time_minutes": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "difficulty": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "image_path": {
+                    "type": "string"
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ingredients": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/recipe.IngredientResponse"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "prep_time_minutes": {
+                    "type": "integer"
+                },
+                "servings": {
+                    "type": "integer"
+                },
+                "steps": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/recipe.StepResponse"
+                    }
+                },
+                "tags": {
+                    "$ref": "#/definitions/types.TagsGrouped"
+                },
+                "total_time_minutes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "recipe.RecipeUpdateRequest": {
+            "type": "object",
+            "properties": {
+                "additional_notes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "category": {
+                    "type": "string"
+                },
+                "cook_time_minutes": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "difficulty": {
+                    "type": "integer"
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ingredients": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/recipe.IngredientRequest"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "prep_time_minutes": {
+                    "type": "integer"
+                },
+                "servings": {
+                    "type": "integer"
+                },
+                "steps": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/recipe.StepRequest"
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "total_time_minutes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "recipe.StepRequest": {
+            "type": "object",
+            "required": [
+                "description",
+                "step"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "step": {
+                    "type": "integer"
+                }
+            }
+        },
+        "recipe.StepResponse": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "step": {
+                    "type": "integer"
+                }
+            }
+        },
+        "recommend.ContextRequest": {
+            "type": "object",
+            "required": [
+                "latitude",
+                "longitude"
+            ],
+            "properties": {
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "timestamp": {
+                    "type": "integer"
+                }
+            }
+        },
+        "recommend.ContextResponse": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "$ref": "#/definitions/recommend.LocationInfo"
+                },
+                "time": {
+                    "$ref": "#/definitions/recommend.TimeInfo"
+                },
+                "weather": {
+                    "$ref": "#/definitions/recommend.WeatherInfoResponse"
+                }
+            }
+        },
+        "recommend.LocationInfo": {
+            "type": "object",
+            "properties": {
+                "city": {
+                    "type": "string"
+                },
+                "district": {
+                    "type": "string"
+                },
+                "province": {
+                    "type": "string"
+                }
+            }
+        },
+        "recommend.RecommendRecipeItem": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "difficulty": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "image_path": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "reason": {
+                    "description": "该菜品的推荐理由",
+                    "type": "string"
+                },
+                "tags": {
+                    "$ref": "#/definitions/types.TagsGrouped"
+                },
+                "total_time_minutes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "recommend.RecommendRequest": {
+            "type": "object",
+            "required": [
+                "latitude",
+                "longitude"
+            ],
+            "properties": {
+                "exclude_ids": {
+                    "description": "排除的菜谱 ID（换一批时传入已推荐的）",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "timestamp": {
+                    "type": "integer"
+                }
+            }
+        },
+        "recommend.RecommendResponse": {
+            "type": "object",
+            "properties": {
+                "recipes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/recommend.RecommendRecipeItem"
+                    }
+                },
+                "remaining": {
+                    "description": "今日剩余推荐次数",
+                    "type": "integer"
+                },
+                "summary": {
+                    "description": "LLM 生成的一句话整体评价",
+                    "type": "string"
+                }
+            }
+        },
+        "recommend.TimeInfo": {
+            "type": "object",
+            "properties": {
+                "day_of_week": {
+                    "type": "integer"
+                },
+                "hour": {
+                    "type": "integer"
+                },
+                "meal_time": {
+                    "type": "string"
+                },
+                "season": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "integer"
+                }
+            }
+        },
+        "recommend.WeatherInfoResponse": {
+            "type": "object",
+            "properties": {
+                "humidity": {
+                    "type": "integer"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "temperature": {
+                    "type": "number"
+                },
+                "weather": {
+                    "type": "string"
+                }
+            }
+        },
+        "tag.CreateTagRequest": {
+            "type": "object",
+            "required": [
+                "label",
+                "type",
+                "value"
+            ],
+            "properties": {
+                "label": {
+                    "description": "显示名称",
+                    "type": "string"
+                },
+                "recipe_id": {
+                    "description": "菜谱ID（可选，为空时创建选项）",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "标签类型",
+                    "type": "string"
+                },
+                "value": {
+                    "description": "标签值",
+                    "type": "string"
+                }
+            }
+        },
+        "tag.TagValueResponse": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "tag.UpdateTagRequest": {
+            "type": "object",
+            "required": [
+                "label"
+            ],
+            "properties": {
+                "label": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.RecipeListItem": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "difficulty": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "image_path": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "tags": {
+                    "$ref": "#/definitions/types.TagsGrouped"
+                },
+                "total_time_minutes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.TagsGrouped": {
+            "type": "object",
+            "properties": {
+                "cuisines": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "flavors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "scenes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "upload.UploadImageResponse": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "description": "上传后的图片 URL",
+                    "type": "string"
                 }
             }
         }

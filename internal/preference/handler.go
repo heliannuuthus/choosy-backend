@@ -1,27 +1,26 @@
-package handlers
+package preference
 
 import (
 	"net/http"
 
-	"choosy-backend/internal/auth"
-	"choosy-backend/internal/logger"
-	"choosy-backend/internal/preference"
-	"choosy-backend/internal/tag"
+	"zwei-backend/internal/auth"
+	"zwei-backend/internal/logger"
+	"zwei-backend/internal/tag"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
-// PreferenceHandler 用户偏好处理器
-type PreferenceHandler struct {
-	service *preference.Service
+// Handler 用户偏好处理器
+type Handler struct {
+	service *Service
 }
 
-// NewPreferenceHandler 创建用户偏好处理器
-func NewPreferenceHandler(db *gorm.DB) *PreferenceHandler {
-	return &PreferenceHandler{
-		service: preference.NewService(db),
+// NewHandler 创建用户偏好处理器
+func NewHandler(db *gorm.DB) *Handler {
+	return &Handler{
+		service: NewService(db),
 	}
 }
 
@@ -33,7 +32,7 @@ func NewPreferenceHandler(db *gorm.DB) *PreferenceHandler {
 // @Success 200 {object} preference.OptionsResponse
 // @Failure 500 {object} map[string]string
 // @Router /api/preferences [get]
-func (h *PreferenceHandler) GetOptions(c *gin.Context) {
+func (h *Handler) GetOptions(c *gin.Context) {
 	options, err := h.service.GetOptions()
 	if err != nil {
 		logger.Error("获取偏好选项失败", zap.Error(err))
@@ -54,7 +53,7 @@ func (h *PreferenceHandler) GetOptions(c *gin.Context) {
 // @Failure 401 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/user/preference [get]
-func (h *PreferenceHandler) GetUserPreferences(c *gin.Context) {
+func (h *Handler) GetUserPreferences(c *gin.Context) {
 	// 获取当前用户
 	user, exists := c.Get("user")
 	if !exists {
@@ -86,7 +85,7 @@ func (h *PreferenceHandler) GetUserPreferences(c *gin.Context) {
 // @Failure 401 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/user/preference [put]
-func (h *PreferenceHandler) UpdateUserPreferences(c *gin.Context) {
+func (h *Handler) UpdateUserPreferences(c *gin.Context) {
 	// 获取当前用户
 	user, exists := c.Get("user")
 	if !exists {
@@ -95,7 +94,7 @@ func (h *PreferenceHandler) UpdateUserPreferences(c *gin.Context) {
 	}
 
 	identity := user.(*auth.Identity)
-	var req preference.UpdatePreferencesRequest
+	var req UpdatePreferencesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误: " + err.Error()})
 		return

@@ -7,21 +7,22 @@
 package main
 
 import (
-	"choosy-backend/internal/auth"
-	"choosy-backend/internal/database"
-	"choosy-backend/internal/favorite"
-	"choosy-backend/internal/handlers"
-	"choosy-backend/internal/history"
-	"choosy-backend/internal/preference"
-	"choosy-backend/internal/recipe"
-	"choosy-backend/internal/recommend"
-	"choosy-backend/internal/tag"
 	"github.com/google/wire"
 	"gorm.io/gorm"
+	"zwei-backend/internal/auth"
+	"zwei-backend/internal/database"
+	"zwei-backend/internal/favorite"
+	"zwei-backend/internal/history"
+	"zwei-backend/internal/home"
+	"zwei-backend/internal/preference"
+	"zwei-backend/internal/recipe"
+	"zwei-backend/internal/recommend"
+	"zwei-backend/internal/tag"
+	"zwei-backend/internal/upload"
 )
 
 import (
-	_ "choosy-backend/docs"
+	_ "zwei-backend/docs"
 )
 
 // Injectors from wire.go:
@@ -29,18 +30,18 @@ import (
 // InitializeApp 初始化应用（由 wire 生成）
 func InitializeApp() (*App, error) {
 	db := database.Get()
-	recipeHandler := handlers.NewRecipeHandler(db)
-	authHandler := handlers.NewAuthHandler(db)
-	favoriteHandler := handlers.NewFavoriteHandler(db)
-	historyHandler := handlers.NewHistoryHandler(db)
-	homeHandler := handlers.NewHomeHandler(db)
-	tagHandler := handlers.NewTagHandler(db)
-	recommendHandler := handlers.NewRecommendHandler(db)
-	uploadHandler := handlers.NewUploadHandler(db)
-	preferenceHandler := handlers.NewPreferenceHandler(db)
+	handler := recipe.NewHandler(db)
+	authHandler := auth.NewHandler(db)
+	favoriteHandler := favorite.NewHandler(db)
+	historyHandler := history.NewHandler(db)
+	homeHandler := home.NewHandler(db)
+	tagHandler := tag.NewHandler(db)
+	recommendHandler := recommend.NewHandler(db)
+	uploadHandler := upload.NewHandler(db)
+	preferenceHandler := preference.NewHandler(db)
 	app := &App{
 		DB:                db,
-		RecipeHandler:     recipeHandler,
+		RecipeHandler:     handler,
 		AuthHandler:       authHandler,
 		FavoriteHandler:   favoriteHandler,
 		HistoryHandler:    historyHandler,
@@ -56,18 +57,18 @@ func InitializeApp() (*App, error) {
 // wire.go:
 
 // ProviderSet 提供者集合
-var ProviderSet = wire.NewSet(database.Get, recipe.NewService, auth.NewService, favorite.NewService, history.NewService, preference.NewService, tag.NewService, recommend.NewService, handlers.NewRecipeHandler, handlers.NewAuthHandler, handlers.NewFavoriteHandler, handlers.NewHistoryHandler, handlers.NewHomeHandler, handlers.NewTagHandler, handlers.NewRecommendHandler, handlers.NewUploadHandler, handlers.NewPreferenceHandler)
+var ProviderSet = wire.NewSet(database.Get, recipe.NewService, auth.NewService, favorite.NewService, history.NewService, preference.NewService, tag.NewService, recommend.NewService, recipe.NewHandler, auth.NewHandler, favorite.NewHandler, history.NewHandler, home.NewHandler, tag.NewHandler, recommend.NewHandler, upload.NewHandler, preference.NewHandler)
 
 // App 应用依赖容器
 type App struct {
 	DB                *gorm.DB
-	RecipeHandler     *handlers.RecipeHandler
-	AuthHandler       *handlers.AuthHandler
-	FavoriteHandler   *handlers.FavoriteHandler
-	HistoryHandler    *handlers.HistoryHandler
-	HomeHandler       *handlers.HomeHandler
-	TagHandler        *handlers.TagHandler
-	RecommendHandler  *handlers.RecommendHandler
-	UploadHandler     *handlers.UploadHandler
-	PreferenceHandler *handlers.PreferenceHandler
+	RecipeHandler     *recipe.Handler
+	AuthHandler       *auth.Handler
+	FavoriteHandler   *favorite.Handler
+	HistoryHandler    *history.Handler
+	HomeHandler       *home.Handler
+	TagHandler        *tag.Handler
+	RecommendHandler  *recommend.Handler
+	UploadHandler     *upload.Handler
+	PreferenceHandler *preference.Handler
 }

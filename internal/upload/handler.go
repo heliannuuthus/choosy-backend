@@ -1,4 +1,4 @@
-package handlers
+package upload
 
 import (
 	"bytes"
@@ -8,21 +8,21 @@ import (
 	"strings"
 	"time"
 
-	"choosy-backend/internal/auth"
-	"choosy-backend/internal/logger"
-	"choosy-backend/internal/models"
-	"choosy-backend/internal/oss"
+	"zwei-backend/internal/auth"
+	"zwei-backend/internal/logger"
+	"zwei-backend/internal/models"
+	"zwei-backend/internal/oss"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-type UploadHandler struct {
+type Handler struct {
 	db *gorm.DB
 }
 
-func NewUploadHandler(db *gorm.DB) *UploadHandler {
-	return &UploadHandler{db: db}
+func NewHandler(db *gorm.DB) *Handler {
+	return &Handler{db: db}
 }
 
 type UploadImageRequest struct {
@@ -48,7 +48,7 @@ type UploadImageResponse struct {
 // @Failure 401 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/upload/image [post]
-func (h *UploadHandler) UploadImage(c *gin.Context) {
+func (h *Handler) UploadImage(c *gin.Context) {
 	// 检查认证（可选，如果需要登录才能上传则取消注释）
 	user, exists := c.Get("user")
 	if !exists {
@@ -139,7 +139,7 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 }
 
 // uploadToOSSAsync 异步上传文件到 OSS（优先使用 STS 凭证，失败则回退到主账号凭证）
-func (h *UploadHandler) uploadToOSSAsync(openid, objectKey string, reader io.Reader) {
+func (h *Handler) uploadToOSSAsync(openid, objectKey string, reader io.Reader) {
 	logger.Infof("[Upload] 开始异步上传 - OpenID: %s, ObjectKey: %s", openid, objectKey)
 
 	// 尝试生成 STS 凭证（如果 STS 已配置）
@@ -180,7 +180,7 @@ func (h *UploadHandler) uploadToOSSAsync(openid, objectKey string, reader io.Rea
 
 // updateAvatarIfNeeded 如果是头像上传，更新用户头像
 // 注意：此时 objectKey 已经保证是正确的（由认证用户的 openid 生成），无需再次验证
-func (h *UploadHandler) updateAvatarIfNeeded(openid, objectKey, uploadURL string) {
+func (h *Handler) updateAvatarIfNeeded(openid, objectKey, uploadURL string) {
 	// 如果是头像上传（路径为 avatars/{openid}.jpg），自动更新用户头像
 	// objectKey 已经由后端强制生成，保证 openid 正确，无需再次验证
 	if strings.HasPrefix(objectKey, "avatars/") && strings.HasSuffix(objectKey, ".jpg") {

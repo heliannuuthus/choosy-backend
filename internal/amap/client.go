@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"choosy-backend/internal/config"
+	"zwei-backend/internal/config"
 )
 
 // Client 高德地图客户端

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"choosy-backend/internal/models"
+	"zwei-backend/internal/models"
 
 	"gorm.io/gorm"
 )

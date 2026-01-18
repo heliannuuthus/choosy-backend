@@ -4,15 +4,16 @@
 package main
 
 import (
-	"choosy-backend/internal/auth"
-	"choosy-backend/internal/database"
-	"choosy-backend/internal/favorite"
-	"choosy-backend/internal/handlers"
-	"choosy-backend/internal/history"
-	"choosy-backend/internal/preference"
-	"choosy-backend/internal/recipe"
-	"choosy-backend/internal/recommend"
-	"choosy-backend/internal/tag"
+	"zwei-backend/internal/auth"
+	"zwei-backend/internal/database"
+	"zwei-backend/internal/favorite"
+	"zwei-backend/internal/history"
+	"zwei-backend/internal/home"
+	"zwei-backend/internal/preference"
+	"zwei-backend/internal/recipe"
+	"zwei-backend/internal/recommend"
+	"zwei-backend/internal/tag"
+	"zwei-backend/internal/upload"
 
 	"github.com/google/wire"
 	"gorm.io/gorm"
@@ -28,29 +29,29 @@ var ProviderSet = wire.NewSet(
 	preference.NewService,
 	tag.NewService,
 	recommend.NewService,
-	handlers.NewRecipeHandler,
-	handlers.NewAuthHandler,
-	handlers.NewFavoriteHandler,
-	handlers.NewHistoryHandler,
-	handlers.NewHomeHandler,
-	handlers.NewTagHandler,
-	handlers.NewRecommendHandler,
-	handlers.NewUploadHandler,
-	handlers.NewPreferenceHandler,
+	recipe.NewHandler,
+	auth.NewHandler,
+	favorite.NewHandler,
+	history.NewHandler,
+	home.NewHandler,
+	tag.NewHandler,
+	recommend.NewHandler,
+	upload.NewHandler,
+	preference.NewHandler,
 )
 
 // App 应用依赖容器
 type App struct {
 	DB                *gorm.DB
-	RecipeHandler     *handlers.RecipeHandler
-	AuthHandler       *handlers.AuthHandler
-	FavoriteHandler   *handlers.FavoriteHandler
-	HistoryHandler    *handlers.HistoryHandler
-	HomeHandler       *handlers.HomeHandler
-	TagHandler        *handlers.TagHandler
-	RecommendHandler  *handlers.RecommendHandler
-	UploadHandler     *handlers.UploadHandler
-	PreferenceHandler *handlers.PreferenceHandler
+	RecipeHandler     *recipe.Handler
+	AuthHandler       *auth.Handler
+	FavoriteHandler   *favorite.Handler
+	HistoryHandler    *history.Handler
+	HomeHandler       *home.Handler
+	TagHandler        *tag.Handler
+	RecommendHandler  *recommend.Handler
+	UploadHandler     *upload.Handler
+	PreferenceHandler *preference.Handler
 }
 
 // InitializeApp 初始化应用（由 wire 生成）

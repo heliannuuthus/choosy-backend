@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"choosy-backend/internal/auth"
-	"choosy-backend/internal/logger"
+	"zwei-backend/internal/auth"
+	"zwei-backend/internal/logger"
 
 	"github.com/gin-gonic/gin"
 )

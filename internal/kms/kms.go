@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"sync"
 
-	"choosy-backend/internal/config"
-	"choosy-backend/internal/logger"
+	"zwei-backend/internal/config"
+	"zwei-backend/internal/logger"
 )
 
 var (

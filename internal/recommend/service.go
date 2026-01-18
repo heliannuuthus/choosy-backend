@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"choosy-backend/internal/amap"
-	"choosy-backend/internal/config"
-	"choosy-backend/internal/logger"
-	"choosy-backend/internal/models"
-	"choosy-backend/internal/tag"
-	"choosy-backend/internal/utils"
+	"zwei-backend/internal/amap"
+	"zwei-backend/internal/config"
+	"zwei-backend/internal/logger"
+	"zwei-backend/internal/models"
+	"zwei-backend/internal/tag"
+	"zwei-backend/internal/utils"
 
 	"github.com/invopop/jsonschema"
 	"github.com/sashabaranov/go-openai"
@@ -26,12 +26,20 @@ type Service struct {
 	llmClient *openai.Client
 }
 
-// WeatherInfo 天气信息
+// WeatherInfo 天气信息（内部使用）
 type WeatherInfo struct {
 	Temperature float64 `json:"temperature"`
 	Humidity    int     `json:"humidity"`
 	Weather     string  `json:"weather"`
 	City        string  `json:"city"`
+}
+
+// WeatherInfoResponse 天气信息响应（API 使用）
+type WeatherInfoResponse struct {
+	Temperature float64 `json:"temperature"`
+	Humidity    int     `json:"humidity"`
+	Weather     string  `json:"weather"`
+	Icon        string  `json:"icon"`
 }
 
 // Context 推荐上下文

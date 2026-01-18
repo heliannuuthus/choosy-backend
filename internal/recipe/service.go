@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"choosy-backend/internal/models"
-	"choosy-backend/internal/tag"
+	"zwei-backend/internal/models"
+	"zwei-backend/internal/tag"
 
 	"github.com/dgraph-io/ristretto"
 	"gorm.io/gorm"

@@ -1,8 +1,8 @@
-# Choosy 后端配置文件
+# Zwei 后端配置文件
 # 复制此文件为 config.toml 并填入实际值
 
 [app]
-name = "Choosy API"
+name = "Zwei API"
 version = "1.0.0"
 debug = true
 
@@ -15,7 +15,11 @@ host = "0.0.0.0"
 port = 18000
 
 [database]
-url = "db/choosy.db"
+host = "localhost"      # MySQL 主机地址
+port = 3306             # MySQL 端口
+user = "zwei"         # MySQL 用户名
+password = ""           # MySQL 密码
+name = "zwei"         # 数据库名称
 
 [cors]
 origins = ["*"]
@@ -50,12 +54,13 @@ secret = ""  # 抖音小程序 Secret
 # 支付宝小程序配置 (https://open.alipay.com/)
 [idps.alipay]
 appid = ""  # 支付宝小程序 AppID
-secret = ""  # 支付宝小程序 Secret（实际是应用私钥，需要 RSA 签名）
+secret = ""  # 应用私钥（PKCS8 DER Base64，用于签名请求）
+verify-key = ""  # 支付宝公钥（PKCS8 DER Base64，上传应用公钥后支付宝返回，用于验证响应签名）
 
 # 认证配置
 [auth]
-issuer = "choosy.heliannuuthus.com"
-audience = "choosy"
+issuer = "zwei.heliannuuthus.com"
+audience = "zwei"
 expires-in = 7200           # access_token 过期时间(秒)，2小时
 refresh-expires-in = 365     # refresh_token 过期时间(天)，1年
 max-refresh-token = 10       # 每用户最大 refresh_token 数

@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 COPY . .
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=1 go build -ldflags="-s -w" -o choosy-backend .
+    CGO_ENABLED=1 go build -ldflags="-s -w" -o zwei-backend .
 
 FROM alpine:3.21
 
@@ -22,7 +22,7 @@ RUN apk add --no-cache ca-certificates tzdata && \
 
 WORKDIR /app
 
-COPY --from=builder /app/choosy-backend .
+COPY --from=builder /app/zwei-backend .
 COPY config.example.toml ./config.toml
 
 # 构建参数：环境标识（prod 表示生产环境，使用内网 OSS）
@@ -33,4 +33,4 @@ USER app
 
 EXPOSE 18000
 
-CMD ["./choosy-backend"]
+CMD ["./zwei-backend"]
