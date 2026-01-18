@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"choosy-backend/internal/config"
-	"choosy-backend/internal/logger"
+	"zwei-backend/internal/config"
+	"zwei-backend/internal/logger"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sts"

@@ -1,460 +1,25 @@
 basePath: /api
 definitions:
-  handlers.BannerItem:
+  auth.IdpProfileRequest:
     properties:
-      id:
-        type: string
-      image_url:
-        type: string
-      link:
-        type: string
-      link_type:
-        type: string
-      title:
+      phone_code:
         type: string
     type: object
-  handlers.BatchCheckRequest:
-    properties:
-      recipe_ids:
-        items:
-          type: string
-        type: array
-    required:
-    - recipe_ids
-    type: object
-  handlers.BatchCheckResponse:
-    properties:
-      favorited_ids:
-        items:
-          type: string
-        type: array
-    type: object
-  handlers.CategoryResponse:
-    properties:
-      key:
-        type: string
-      label:
-        type: string
-    type: object
-  handlers.CheckFavoriteResponse:
-    properties:
-      is_favorite:
-        type: boolean
-    type: object
-  handlers.ContextRequest:
-    properties:
-      latitude:
-        type: number
-      longitude:
-        type: number
-      timestamp:
-        type: integer
-    required:
-    - latitude
-    - longitude
-    type: object
-  handlers.ContextResponse:
-    properties:
-      location:
-        $ref: '#/definitions/handlers.LocationInfo'
-      time:
-        $ref: '#/definitions/handlers.TimeInfo'
-      weather:
-        $ref: '#/definitions/handlers.WeatherInfo'
-    type: object
-  handlers.CreateTagRequest:
-    properties:
-      label:
-        description: 显示名称
-        type: string
-      recipe_id:
-        description: 菜谱ID（可选，为空时创建选项）
-        type: string
-      type:
-        description: 标签类型
-        type: string
-      value:
-        description: 标签值
-        type: string
-    required:
-    - label
-    - type
-    - value
-    type: object
-  handlers.FavoriteListItem:
-    properties:
-      created_at:
-        type: string
-      recipe:
-        $ref: '#/definitions/handlers.RecipeListItem'
-      recipe_id:
-        type: string
-    type: object
-  handlers.FavoriteListResponse:
-    properties:
-      items:
-        items:
-          $ref: '#/definitions/handlers.FavoriteListItem'
-        type: array
-      total:
-        type: integer
-    type: object
-  handlers.FavoriteRequest:
-    properties:
-      recipe_id:
-        type: string
-    required:
-    - recipe_id
-    type: object
-  handlers.FavoriteResponse:
-    properties:
-      created_at:
-        type: string
-      recipe_id:
-        type: string
-    type: object
-  handlers.HistoryListItem:
-    properties:
-      recipe:
-        $ref: '#/definitions/handlers.RecipeListItem'
-      recipe_id:
-        type: string
-      viewed_at:
-        type: string
-    type: object
-  handlers.HistoryListResponse:
-    properties:
-      items:
-        items:
-          $ref: '#/definitions/handlers.HistoryListItem'
-        type: array
-      total:
-        type: integer
-    type: object
-  handlers.HistoryRequest:
-    properties:
-      recipe_id:
-        type: string
-    required:
-    - recipe_id
-    type: object
-  handlers.HistoryResponse:
-    properties:
-      recipe_id:
-        type: string
-      viewed_at:
-        type: string
-    type: object
-  handlers.IngredientRequest:
-    properties:
-      name:
-        type: string
-      notes:
-        type: string
-      quantity:
-        type: number
-      text_quantity:
-        type: string
-      unit:
-        type: string
-    required:
-    - name
-    - text_quantity
-    type: object
-  handlers.IngredientResponse:
-    properties:
-      category:
-        type: string
-      id:
-        type: integer
-      name:
-        type: string
-      notes:
-        type: string
-      quantity:
-        type: number
-      text_quantity:
-        type: string
-      unit:
-        type: string
-    type: object
-  handlers.LocationInfo:
-    properties:
-      city:
-        type: string
-      district:
-        type: string
-      province:
-        type: string
-    type: object
-  handlers.OAuth2Error:
+  auth.OAuth2Error:
     properties:
       error:
         type: string
       error_description:
         type: string
     type: object
-  handlers.RecipeCreateRequest:
-    properties:
-      additional_notes:
-        items:
-          type: string
-        type: array
-      category:
-        type: string
-      cook_time_minutes:
-        type: integer
-      description:
-        type: string
-      difficulty:
-        type: integer
-      id:
-        type: string
-      images:
-        items:
-          type: string
-        type: array
-      ingredients:
-        items:
-          $ref: '#/definitions/handlers.IngredientRequest'
-        type: array
-      name:
-        type: string
-      prep_time_minutes:
-        type: integer
-      servings:
-        type: integer
-      steps:
-        items:
-          $ref: '#/definitions/handlers.StepRequest'
-        type: array
-      tags:
-        items:
-          type: string
-        type: array
-      total_time_minutes:
-        type: integer
-    required:
-    - category
-    - difficulty
-    - name
-    - servings
-    type: object
-  handlers.RecipeListItem:
-    properties:
-      category:
-        type: string
-      description:
-        type: string
-      difficulty:
-        type: integer
-      id:
-        type: string
-      image_path:
-        type: string
-      name:
-        type: string
-      tags:
-        $ref: '#/definitions/handlers.TagsGrouped'
-      total_time_minutes:
-        type: integer
-    type: object
-  handlers.RecipeResponse:
-    properties:
-      additional_notes:
-        items:
-          type: string
-        type: array
-      category:
-        type: string
-      cook_time_minutes:
-        type: integer
-      description:
-        type: string
-      difficulty:
-        type: integer
-      id:
-        type: string
-      image_path:
-        type: string
-      images:
-        items:
-          type: string
-        type: array
-      ingredients:
-        items:
-          $ref: '#/definitions/handlers.IngredientResponse'
-        type: array
-      name:
-        type: string
-      prep_time_minutes:
-        type: integer
-      servings:
-        type: integer
-      steps:
-        items:
-          $ref: '#/definitions/handlers.StepResponse'
-        type: array
-      tags:
-        $ref: '#/definitions/handlers.TagsGrouped'
-      total_time_minutes:
-        type: integer
-    type: object
-  handlers.RecipeUpdateRequest:
-    properties:
-      additional_notes:
-        items:
-          type: string
-        type: array
-      category:
-        type: string
-      cook_time_minutes:
-        type: integer
-      description:
-        type: string
-      difficulty:
-        type: integer
-      images:
-        items:
-          type: string
-        type: array
-      ingredients:
-        items:
-          $ref: '#/definitions/handlers.IngredientRequest'
-        type: array
-      name:
-        type: string
-      prep_time_minutes:
-        type: integer
-      servings:
-        type: integer
-      steps:
-        items:
-          $ref: '#/definitions/handlers.StepRequest'
-        type: array
-      tags:
-        items:
-          type: string
-        type: array
-      total_time_minutes:
-        type: integer
-    type: object
-  handlers.RecommendRecipeItem:
-    properties:
-      category:
-        type: string
-      description:
-        type: string
-      difficulty:
-        type: integer
-      id:
-        type: string
-      image_path:
-        type: string
-      name:
-        type: string
-      reason:
-        description: 该菜品的推荐理由
-        type: string
-      tags:
-        $ref: '#/definitions/handlers.TagsGrouped'
-      total_time_minutes:
-        type: integer
-    type: object
-  handlers.RecommendRequest:
-    properties:
-      exclude_ids:
-        description: 排除的菜谱 ID（换一批时传入已推荐的）
-        items:
-          type: string
-        type: array
-      latitude:
-        type: number
-      longitude:
-        type: number
-      timestamp:
-        type: integer
-    required:
-    - latitude
-    - longitude
-    type: object
-  handlers.RecommendResponse:
-    properties:
-      recipes:
-        items:
-          $ref: '#/definitions/handlers.RecommendRecipeItem'
-        type: array
-      remaining:
-        description: 今日剩余推荐次数
-        type: integer
-      summary:
-        description: LLM 生成的一句话整体评价
-        type: string
-    type: object
-  handlers.StatsResponse:
+  auth.StatsResponse:
     properties:
       favorites:
-        description: 收藏数
         type: integer
       history:
-        description: 浏览历史数
         type: integer
     type: object
-  handlers.StepRequest:
-    properties:
-      description:
-        type: string
-      step:
-        type: integer
-    required:
-    - description
-    - step
-    type: object
-  handlers.StepResponse:
-    properties:
-      description:
-        type: string
-      id:
-        type: integer
-      step:
-        type: integer
-    type: object
-  handlers.TagValueResponse:
-    properties:
-      label:
-        type: string
-      value:
-        type: string
-    type: object
-  handlers.TagsGrouped:
-    properties:
-      cuisines:
-        items:
-          type: string
-        type: array
-      flavors:
-        items:
-          type: string
-        type: array
-      scenes:
-        items:
-          type: string
-        type: array
-    type: object
-  handlers.TimeInfo:
-    properties:
-      day_of_week:
-        type: integer
-      hour:
-        type: integer
-      meal_time:
-        type: string
-      season:
-        type: string
-      timestamp:
-        type: integer
-    type: object
-  handlers.TokenResponse:
+  auth.TokenResponse:
     properties:
       access_token:
         type: string
@@ -465,10 +30,9 @@ definitions:
       token_type:
         type: string
     type: object
-  handlers.UpdateProfileRequest:
+  auth.UpdateProfileRequest:
     properties:
       avatar:
-        description: 移除 url 验证，允许临时路径或 OSS URL
         maxLength: 512
         type: string
       gender:
@@ -480,24 +44,8 @@ definitions:
       nickname:
         maxLength: 64
         type: string
-      phone_code:
-        description: 小程序授权码，用于绑定手机号；传空字符串表示解绑，不传则不处理
-        type: string
     type: object
-  handlers.UpdateTagRequest:
-    properties:
-      label:
-        type: string
-    required:
-    - label
-    type: object
-  handlers.UploadImageResponse:
-    properties:
-      url:
-        description: 上传后的图片 URL
-        type: string
-    type: object
-  handlers.UserProfile:
+  auth.UserProfile:
     properties:
       avatar:
         type: string
@@ -510,15 +58,102 @@ definitions:
       phone:
         type: string
     type: object
-  handlers.WeatherInfo:
+  favorite.BatchCheckRequest:
     properties:
-      humidity:
-        type: integer
-      icon:
+      recipe_ids:
+        items:
+          type: string
+        type: array
+    required:
+    - recipe_ids
+    type: object
+  favorite.BatchCheckResponse:
+    properties:
+      favorited_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  favorite.CheckFavoriteResponse:
+    properties:
+      is_favorite:
+        type: boolean
+    type: object
+  favorite.FavoriteListItem:
+    properties:
+      created_at:
         type: string
-      temperature:
-        type: number
-      weather:
+      recipe:
+        $ref: '#/definitions/types.RecipeListItem'
+      recipe_id:
+        type: string
+    type: object
+  favorite.FavoriteListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/favorite.FavoriteListItem'
+        type: array
+      total:
+        type: integer
+    type: object
+  favorite.FavoriteRequest:
+    properties:
+      recipe_id:
+        type: string
+    required:
+    - recipe_id
+    type: object
+  favorite.FavoriteResponse:
+    properties:
+      created_at:
+        type: string
+      recipe_id:
+        type: string
+    type: object
+  history.HistoryListItem:
+    properties:
+      recipe:
+        $ref: '#/definitions/types.RecipeListItem'
+      recipe_id:
+        type: string
+      viewed_at:
+        type: string
+    type: object
+  history.HistoryListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/history.HistoryListItem'
+        type: array
+      total:
+        type: integer
+    type: object
+  history.HistoryRequest:
+    properties:
+      recipe_id:
+        type: string
+    required:
+    - recipe_id
+    type: object
+  history.HistoryResponse:
+    properties:
+      recipe_id:
+        type: string
+      viewed_at:
+        type: string
+    type: object
+  home.BannerItem:
+    properties:
+      id:
+        type: string
+      image_url:
+        type: string
+      link:
+        type: string
+      link_type:
+        type: string
+      title:
         type: string
     type: object
   preference.OptionItem:
@@ -596,6 +231,370 @@ definitions:
           $ref: '#/definitions/preference.OptionItemWithSelected'
         type: array
     type: object
+  recipe.CategoryResponse:
+    properties:
+      key:
+        type: string
+      label:
+        type: string
+    type: object
+  recipe.IngredientRequest:
+    properties:
+      name:
+        type: string
+      notes:
+        type: string
+      quantity:
+        type: number
+      text_quantity:
+        type: string
+      unit:
+        type: string
+    required:
+    - name
+    - text_quantity
+    type: object
+  recipe.IngredientResponse:
+    properties:
+      category:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      notes:
+        type: string
+      quantity:
+        type: number
+      text_quantity:
+        type: string
+      unit:
+        type: string
+    type: object
+  recipe.RecipeCreateRequest:
+    properties:
+      additional_notes:
+        items:
+          type: string
+        type: array
+      category:
+        type: string
+      cook_time_minutes:
+        type: integer
+      description:
+        type: string
+      difficulty:
+        type: integer
+      id:
+        type: string
+      images:
+        items:
+          type: string
+        type: array
+      ingredients:
+        items:
+          $ref: '#/definitions/recipe.IngredientRequest'
+        type: array
+      name:
+        type: string
+      prep_time_minutes:
+        type: integer
+      servings:
+        type: integer
+      steps:
+        items:
+          $ref: '#/definitions/recipe.StepRequest'
+        type: array
+      tags:
+        items:
+          type: string
+        type: array
+      total_time_minutes:
+        type: integer
+    required:
+    - category
+    - difficulty
+    - name
+    - servings
+    type: object
+  recipe.RecipeResponse:
+    properties:
+      additional_notes:
+        items:
+          type: string
+        type: array
+      category:
+        type: string
+      cook_time_minutes:
+        type: integer
+      description:
+        type: string
+      difficulty:
+        type: integer
+      id:
+        type: string
+      image_path:
+        type: string
+      images:
+        items:
+          type: string
+        type: array
+      ingredients:
+        items:
+          $ref: '#/definitions/recipe.IngredientResponse'
+        type: array
+      name:
+        type: string
+      prep_time_minutes:
+        type: integer
+      servings:
+        type: integer
+      steps:
+        items:
+          $ref: '#/definitions/recipe.StepResponse'
+        type: array
+      tags:
+        $ref: '#/definitions/types.TagsGrouped'
+      total_time_minutes:
+        type: integer
+    type: object
+  recipe.RecipeUpdateRequest:
+    properties:
+      additional_notes:
+        items:
+          type: string
+        type: array
+      category:
+        type: string
+      cook_time_minutes:
+        type: integer
+      description:
+        type: string
+      difficulty:
+        type: integer
+      images:
+        items:
+          type: string
+        type: array
+      ingredients:
+        items:
+          $ref: '#/definitions/recipe.IngredientRequest'
+        type: array
+      name:
+        type: string
+      prep_time_minutes:
+        type: integer
+      servings:
+        type: integer
+      steps:
+        items:
+          $ref: '#/definitions/recipe.StepRequest'
+        type: array
+      tags:
+        items:
+          type: string
+        type: array
+      total_time_minutes:
+        type: integer
+    type: object
+  recipe.StepRequest:
+    properties:
+      description:
+        type: string
+      step:
+        type: integer
+    required:
+    - description
+    - step
+    type: object
+  recipe.StepResponse:
+    properties:
+      description:
+        type: string
+      id:
+        type: integer
+      step:
+        type: integer
+    type: object
+  recommend.ContextRequest:
+    properties:
+      latitude:
+        type: number
+      longitude:
+        type: number
+      timestamp:
+        type: integer
+    required:
+    - latitude
+    - longitude
+    type: object
+  recommend.ContextResponse:
+    properties:
+      location:
+        $ref: '#/definitions/recommend.LocationInfo'
+      time:
+        $ref: '#/definitions/recommend.TimeInfo'
+      weather:
+        $ref: '#/definitions/recommend.WeatherInfoResponse'
+    type: object
+  recommend.LocationInfo:
+    properties:
+      city:
+        type: string
+      district:
+        type: string
+      province:
+        type: string
+    type: object
+  recommend.RecommendRecipeItem:
+    properties:
+      category:
+        type: string
+      description:
+        type: string
+      difficulty:
+        type: integer
+      id:
+        type: string
+      image_path:
+        type: string
+      name:
+        type: string
+      reason:
+        description: 该菜品的推荐理由
+        type: string
+      tags:
+        $ref: '#/definitions/types.TagsGrouped'
+      total_time_minutes:
+        type: integer
+    type: object
+  recommend.RecommendRequest:
+    properties:
+      exclude_ids:
+        description: 排除的菜谱 ID（换一批时传入已推荐的）
+        items:
+          type: string
+        type: array
+      latitude:
+        type: number
+      longitude:
+        type: number
+      timestamp:
+        type: integer
+    required:
+    - latitude
+    - longitude
+    type: object
+  recommend.RecommendResponse:
+    properties:
+      recipes:
+        items:
+          $ref: '#/definitions/recommend.RecommendRecipeItem'
+        type: array
+      remaining:
+        description: 今日剩余推荐次数
+        type: integer
+      summary:
+        description: LLM 生成的一句话整体评价
+        type: string
+    type: object
+  recommend.TimeInfo:
+    properties:
+      day_of_week:
+        type: integer
+      hour:
+        type: integer
+      meal_time:
+        type: string
+      season:
+        type: string
+      timestamp:
+        type: integer
+    type: object
+  recommend.WeatherInfoResponse:
+    properties:
+      humidity:
+        type: integer
+      icon:
+        type: string
+      temperature:
+        type: number
+      weather:
+        type: string
+    type: object
+  tag.CreateTagRequest:
+    properties:
+      label:
+        description: 显示名称
+        type: string
+      recipe_id:
+        description: 菜谱ID（可选，为空时创建选项）
+        type: string
+      type:
+        description: 标签类型
+        type: string
+      value:
+        description: 标签值
+        type: string
+    required:
+    - label
+    - type
+    - value
+    type: object
+  tag.TagValueResponse:
+    properties:
+      label:
+        type: string
+      value:
+        type: string
+    type: object
+  tag.UpdateTagRequest:
+    properties:
+      label:
+        type: string
+    required:
+    - label
+    type: object
+  types.RecipeListItem:
+    properties:
+      category:
+        type: string
+      description:
+        type: string
+      difficulty:
+        type: integer
+      id:
+        type: string
+      image_path:
+        type: string
+      name:
+        type: string
+      tags:
+        $ref: '#/definitions/types.TagsGrouped'
+      total_time_minutes:
+        type: integer
+    type: object
+  types.TagsGrouped:
+    properties:
+      cuisines:
+        items:
+          type: string
+        type: array
+      flavors:
+        items:
+          type: string
+        type: array
+      scenes:
+        items:
+          type: string
+        type: array
+    type: object
+  upload.UploadImageResponse:
+    properties:
+      url:
+        description: 上传后的图片 URL
+        type: string
+    type: object
 host: localhost:18000
 info:
   contact: {}
@@ -603,36 +602,54 @@ info:
   title: Choosy API
   version: "1.0"
 paths:
-  /api/context:
+  /api/{idp}/profile:
     post:
       consumes:
       - application/json
-      description: 根据经纬度获取位置、天气、时间信息
       parameters:
-      - description: 上下文请求
+      - description: 身份提供方
+        enum:
+        - wechat:mp
+        - tt:mp
+        - alipay:mp
+        in: path
+        name: idp
+        required: true
+        type: string
+      - description: 更新请求
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.ContextRequest'
+          $ref: '#/definitions/auth.IdpProfileRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.ContextResponse'
+            $ref: '#/definitions/auth.UserProfile'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/auth.OAuth2Error'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
           schema:
             additionalProperties:
               type: string
             type: object
       security:
-      - BearerAuth: []
-      summary: 获取推荐上下文
+      - Bearer: []
+      summary: 更新平台相关用户信息
       tags:
-      - context
+      - auth
   /api/home/banners:
     get:
       produces:
@@ -642,7 +659,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.BannerItem'
+              $ref: '#/definitions/home.BannerItem'
             type: array
       summary: 获取首页 Banner
       tags:
@@ -662,7 +679,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.RecipeListItem'
+              $ref: '#/definitions/types.RecipeListItem'
             type: array
       summary: 获取热门菜谱（按收藏数排序）
       tags:
@@ -682,7 +699,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.RecipeListItem'
+              $ref: '#/definitions/types.RecipeListItem'
             type: array
       summary: 获取推荐菜谱（随机）
       tags:
@@ -734,7 +751,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.RecipeListItem'
+              $ref: '#/definitions/types.RecipeListItem'
             type: array
       summary: 获取菜谱列表
       tags:
@@ -748,14 +765,14 @@ paths:
         name: recipe
         required: true
         schema:
-          $ref: '#/definitions/handlers.RecipeCreateRequest'
+          $ref: '#/definitions/recipe.RecipeCreateRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handlers.RecipeResponse'
+            $ref: '#/definitions/recipe.RecipeResponse'
         "400":
           description: Bad Request
           schema:
@@ -798,7 +815,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.RecipeResponse'
+            $ref: '#/definitions/recipe.RecipeResponse'
         "404":
           description: Not Found
           schema:
@@ -822,14 +839,14 @@ paths:
         name: recipe
         required: true
         schema:
-          $ref: '#/definitions/handlers.RecipeUpdateRequest'
+          $ref: '#/definitions/recipe.RecipeUpdateRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.RecipeResponse'
+            $ref: '#/definitions/recipe.RecipeResponse'
         "404":
           description: Not Found
           schema:
@@ -850,7 +867,7 @@ paths:
         required: true
         schema:
           items:
-            $ref: '#/definitions/handlers.RecipeCreateRequest'
+            $ref: '#/definitions/recipe.RecipeCreateRequest'
           type: array
       produces:
       - application/json
@@ -859,7 +876,7 @@ paths:
           description: Created
           schema:
             items:
-              $ref: '#/definitions/handlers.RecipeResponse'
+              $ref: '#/definitions/recipe.RecipeResponse'
             type: array
       summary: 批量创建菜谱
       tags:
@@ -873,7 +890,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.CategoryResponse'
+              $ref: '#/definitions/recipe.CategoryResponse'
             type: array
       summary: 获取所有分类
       tags:
@@ -889,7 +906,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.RecommendRequest'
+          $ref: '#/definitions/recommend.RecommendRequest'
       - default: 6
         description: 返回数量
         in: query
@@ -901,7 +918,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.RecommendResponse'
+            $ref: '#/definitions/recommend.RecommendResponse'
         "400":
           description: Bad Request
           schema:
@@ -909,6 +926,36 @@ paths:
               type: string
             type: object
       summary: 获取智能推荐菜谱
+      tags:
+      - recommend
+  /api/recommend/context:
+    post:
+      consumes:
+      - application/json
+      description: 根据经纬度获取位置、天气、时间信息
+      parameters:
+      - description: 上下文请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/recommend.ContextRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/recommend.ContextResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 获取推荐上下文
       tags:
       - recommend
   /api/revoke:
@@ -933,7 +980,7 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.OAuth2Error'
+            $ref: '#/definitions/auth.OAuth2Error'
       summary: 撤销 token
       tags:
       - auth
@@ -970,7 +1017,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.StatsResponse'
+            $ref: '#/definitions/auth.StatsResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1001,7 +1048,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.TagValueResponse'
+              $ref: '#/definitions/tag.TagValueResponse'
             type: array
       summary: 获取标签列表
       tags:
@@ -1016,14 +1063,14 @@ paths:
         name: tag
         required: true
         schema:
-          $ref: '#/definitions/handlers.CreateTagRequest'
+          $ref: '#/definitions/tag.CreateTagRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handlers.TagValueResponse'
+            $ref: '#/definitions/tag.TagValueResponse'
         "400":
           description: Bad Request
           schema:
@@ -1049,7 +1096,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.TagValueResponse'
+              $ref: '#/definitions/tag.TagValueResponse'
             type: array
       summary: 根据类型获取标签
       tags:
@@ -1108,14 +1155,14 @@ paths:
         name: tag
         required: true
         schema:
-          $ref: '#/definitions/handlers.UpdateTagRequest'
+          $ref: '#/definitions/tag.UpdateTagRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.TagValueResponse'
+            $ref: '#/definitions/tag.TagValueResponse'
         "400":
           description: Bad Request
           schema:
@@ -1135,7 +1182,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.TagValueResponse'
+              $ref: '#/definitions/tag.TagValueResponse'
             type: array
       summary: 获取所有菜系
       tags:
@@ -1150,7 +1197,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.TagValueResponse'
+              $ref: '#/definitions/tag.TagValueResponse'
             type: array
       summary: 获取所有口味
       tags:
@@ -1165,7 +1212,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.TagValueResponse'
+              $ref: '#/definitions/tag.TagValueResponse'
             type: array
       summary: 获取所有场景
       tags:
@@ -1198,19 +1245,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.TokenResponse'
+            $ref: '#/definitions/auth.TokenResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.OAuth2Error'
+            $ref: '#/definitions/auth.OAuth2Error'
         "412":
           description: refresh_token 无效或已过期
           schema:
-            $ref: '#/definitions/handlers.OAuth2Error'
+            $ref: '#/definitions/auth.OAuth2Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.OAuth2Error'
+            $ref: '#/definitions/auth.OAuth2Error'
       summary: 获取/刷新 token
       tags:
       - auth
@@ -1238,7 +1285,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.UploadImageResponse'
+            $ref: '#/definitions/upload.UploadImageResponse'
         "400":
           description: Bad Request
           schema:
@@ -1289,7 +1336,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.FavoriteListResponse'
+            $ref: '#/definitions/favorite.FavoriteListResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1308,14 +1355,14 @@ paths:
         name: favorite
         required: true
         schema:
-          $ref: '#/definitions/handlers.FavoriteRequest'
+          $ref: '#/definitions/favorite.FavoriteRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handlers.FavoriteResponse'
+            $ref: '#/definitions/favorite.FavoriteResponse'
         "400":
           description: Bad Request
           schema:
@@ -1365,7 +1412,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.CheckFavoriteResponse'
+            $ref: '#/definitions/favorite.CheckFavoriteResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1385,14 +1432,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.BatchCheckRequest'
+          $ref: '#/definitions/favorite.BatchCheckRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.BatchCheckResponse'
+            $ref: '#/definitions/favorite.BatchCheckResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1442,7 +1489,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.HistoryListResponse'
+            $ref: '#/definitions/history.HistoryListResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1461,14 +1508,14 @@ paths:
         name: history
         required: true
         schema:
-          $ref: '#/definitions/handlers.HistoryRequest'
+          $ref: '#/definitions/history.HistoryRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handlers.HistoryResponse'
+            $ref: '#/definitions/history.HistoryResponse'
         "400":
           description: Bad Request
           schema:
@@ -1582,7 +1629,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.UserProfile'
+            $ref: '#/definitions/auth.UserProfile'
         "401":
           description: Unauthorized
           schema:
@@ -1609,14 +1656,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.UpdateProfileRequest'
+          $ref: '#/definitions/auth.UpdateProfileRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.UserProfile'
+            $ref: '#/definitions/auth.UserProfile'
         "400":
           description: Bad Request
           schema:

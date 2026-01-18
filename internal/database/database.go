@@ -1,14 +1,13 @@
 package database
 
 import (
-	"os"
-	"path/filepath"
+	"fmt"
 	"time"
 
-	"choosy-backend/internal/config"
-	"choosy-backend/internal/logger"
+	"zwei-backend/internal/config"
+	"zwei-backend/internal/logger"
 
-	"github.com/glebarez/sqlite"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 )
@@ -21,14 +20,32 @@ func Init() *gorm.DB {
 		return db
 	}
 
-	// 确保数据库目录存在
-	dbPath := config.GetString("database.url")
-	dir := filepath.Dir(dbPath)
-	if dir != "" && dir != "." {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			logger.Fatalf("创建数据库目录失败: %v", err)
-		}
+	// 从配置读取 MySQL 连接信息
+	host := config.GetString("database.host")
+	if host == "" {
+		host = "localhost"
 	}
+	port := config.GetInt("database.port")
+	if port == 0 {
+		port = 3306
+	}
+	user := config.GetString("database.user")
+	if user == "" {
+		user = "zwei"
+	}
+	password := config.GetString("database.password")
+	if password == "" {
+		password = "zwei"
+	}
+	database := config.GetString("database.name")
+	if database == "" {
+		database = "zwei"
+	}
+
+	// 构建 MySQL DSN
+	// 添加连接超时和读写超时参数，避免 unexpected EOF
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local&timeout=10s&readTimeout=30s&writeTimeout=30s",
+		user, password, host, port, database)
 
 	// 配置 GORM 日志（只打印错误）
 	logLevel := gormlogger.Error
@@ -45,12 +62,23 @@ func Init() *gorm.DB {
 	)
 
 	var err error
-	db, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{
+	db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
 		Logger: gormLog,
 	})
 	if err != nil {
 		logger.Fatalf("连接数据库失败: %v", err)
 	}
+
+	// 配置连接池
+	sqlDB, err := db.DB()
+	if err != nil {
+		logger.Fatalf("获取数据库连接失败: %v", err)
+	}
+
+	// 设置连接池参数
+	sqlDB.SetMaxIdleConns(10)           // 最大空闲连接数
+	sqlDB.SetMaxOpenConns(30)           // 最大打开连接数
+	sqlDB.SetConnMaxLifetime(time.Hour) // 连接最大生存时间
 
 	logger.Info("数据库连接成功")
 	return db

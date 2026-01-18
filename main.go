@@ -3,13 +3,12 @@ package main
 import (
 	"fmt"
 
-	"choosy-backend/internal/config"
-	"choosy-backend/internal/handlers"
-	"choosy-backend/internal/logger"
-	"choosy-backend/internal/middleware"
-	"choosy-backend/internal/oss"
+	"zwei-backend/internal/config"
+	"zwei-backend/internal/logger"
+	"zwei-backend/internal/middleware"
+	"zwei-backend/internal/oss"
 
-	_ "choosy-backend/docs" // swagger docs
+	_ "zwei-backend/docs" // swagger docs
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -93,6 +92,9 @@ func main() {
 		api.POST("/revoke-all", middleware.RequireAuth(), app.AuthHandler.LogoutAll)
 		api.GET("/stats", middleware.RequireAuth(), app.AuthHandler.GetStats) // 获取统计数据
 
+		// 平台相关路由（根据不同的 idp 做不同的数据处理）
+		api.POST("/:idp/profile", middleware.RequireAuth(), app.AuthHandler.IdpProfile) // 更新平台相关用户信息
+
 		// 菜谱路由
 		recipes := api.Group("/recipes")
 		{
@@ -145,6 +147,7 @@ func main() {
 		home := api.Group("/home")
 		{
 			home.GET("/banners", app.HomeHandler.GetBanners)
+			home.GET("/recommend", app.HomeHandler.GetRecommendRecipes)
 			home.GET("/hot", app.HomeHandler.GetHotRecipes)
 		}
 
@@ -183,16 +186,15 @@ func main() {
 		}
 
 		// 推荐路由
-		contextHandler := handlers.NewContextHandler()
 		recommend := api.Group("/recommend")
 		{
 			// LLM 推荐菜谱（支持可选认证）
 			recommend.Use(middleware.AuthMiddleware())
 			recommend.POST("", app.RecommendHandler.GetRecommendations)
 
-			// 获取上下文信息（需要登录）
+			// 获取推荐上下文信息（需要登录）
 			recommend.Use(middleware.RequireAuth())
-			recommend.POST("/context", contextHandler.GetContext)
+			recommend.POST("/context", app.RecommendHandler.GetContext)
 		}
 
 		// 上传路由

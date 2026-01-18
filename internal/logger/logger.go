@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"choosy-backend/internal/config"
+	"zwei-backend/internal/config"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

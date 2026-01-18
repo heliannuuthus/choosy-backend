@@ -1,25 +1,25 @@
-package handlers
+package history
 
 import (
 	"net/http"
 	"strconv"
 
-	"choosy-backend/internal/auth"
-	"choosy-backend/internal/history"
+	"zwei-backend/internal/auth"
+	"zwei-backend/internal/types"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-// HistoryHandler 浏览历史处理器
-type HistoryHandler struct {
-	service *history.Service
+// Handler 浏览历史处理器
+type Handler struct {
+	service *Service
 }
 
-// NewHistoryHandler 创建浏览历史处理器
-func NewHistoryHandler(db *gorm.DB) *HistoryHandler {
-	return &HistoryHandler{
-		service: history.NewService(db),
+// NewHandler 创建浏览历史处理器
+func NewHandler(db *gorm.DB) *Handler {
+	return &Handler{
+		service: NewService(db),
 	}
 }
 
@@ -33,9 +33,9 @@ type HistoryResponse struct {
 }
 
 type HistoryListItem struct {
-	RecipeID string          `json:"recipe_id"`
-	ViewedAt string          `json:"viewed_at"`
-	Recipe   *RecipeListItem `json:"recipe,omitempty"`
+	RecipeID string                `json:"recipe_id"`
+	ViewedAt string                `json:"viewed_at"`
+	Recipe   *types.RecipeListItem `json:"recipe,omitempty"`
 }
 
 type HistoryListResponse struct {
@@ -53,7 +53,7 @@ type HistoryListResponse struct {
 // @Failure 400 {object} map[string]string
 // @Failure 401 {object} map[string]string
 // @Router /api/user/history [post]
-func (h *HistoryHandler) AddViewHistory(c *gin.Context) {
+func (h *Handler) AddViewHistory(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"detail": "未登录"})
@@ -88,7 +88,7 @@ func (h *HistoryHandler) AddViewHistory(c *gin.Context) {
 // @Success 204
 // @Failure 401 {object} map[string]string
 // @Router /api/user/history/{recipe_id} [delete]
-func (h *HistoryHandler) RemoveViewHistory(c *gin.Context) {
+func (h *Handler) RemoveViewHistory(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"detail": "未登录"})
@@ -113,7 +113,7 @@ func (h *HistoryHandler) RemoveViewHistory(c *gin.Context) {
 // @Success 204
 // @Failure 401 {object} map[string]string
 // @Router /api/user/history [delete]
-func (h *HistoryHandler) ClearViewHistory(c *gin.Context) {
+func (h *Handler) ClearViewHistory(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"detail": "未登录"})
@@ -142,7 +142,7 @@ func (h *HistoryHandler) ClearViewHistory(c *gin.Context) {
 // @Success 200 {object} HistoryListResponse
 // @Failure 401 {object} map[string]string
 // @Router /api/user/history [get]
-func (h *HistoryHandler) GetViewHistory(c *gin.Context) {
+func (h *Handler) GetViewHistory(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"detail": "未登录"})
@@ -181,13 +181,13 @@ func (h *HistoryHandler) GetViewHistory(c *gin.Context) {
 		}
 
 		if h.Recipe != nil {
-			item.Recipe = &RecipeListItem{
+			item.Recipe = &types.RecipeListItem{
 				ID:               h.Recipe.RecipeID,
 				Name:             h.Recipe.Name,
 				Description:      h.Recipe.Description,
 				Category:         h.Recipe.Category,
 				Difficulty:       h.Recipe.Difficulty,
-				Tags:             GroupTags(h.Recipe.Tags),
+				Tags:             types.GroupTags(h.Recipe.Tags),
 				ImagePath:        h.Recipe.GetImagePath(),
 				TotalTimeMinutes: h.Recipe.TotalTimeMinutes,
 			}

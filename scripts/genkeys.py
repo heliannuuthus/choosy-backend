@@ -19,6 +19,7 @@ import json
 
 try:
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives.asymmetric import rsa
     from cryptography.hazmat.primitives import serialization
     HAS_CRYPTOGRAPHY = True
 except ImportError:
@@ -115,6 +116,38 @@ def generate_aes_raw_key() -> str:
     return b64_encode(key_bytes)
 
 
+def generate_alipay_rsa_keypair() -> tuple[str, str]:
+    """生成支付宝 RSA2048 密钥对（PKCS8 DER 格式）
+    返回 (私钥DER Base64, 公钥DER Base64) 元组
+    """
+    if not HAS_CRYPTOGRAPHY:
+        raise RuntimeError("生成 RSA 密钥需要 cryptography 库，请先安装: pip install cryptography")
+    
+    # 生成 RSA2048 私钥
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,  # 标准公钥指数
+        key_size=2048,
+    )
+    
+    # 序列化私钥为 PKCS8 DER 格式（Base64 编码）
+    private_der = private_key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    private_der_b64 = b64_encode(private_der)
+    
+    # 提取公钥并序列化为 PKCS8 DER 格式（Base64 编码）
+    public_key = private_key.public_key()
+    public_der = public_key.public_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    public_der_b64 = b64_encode(public_der)
+    
+    return private_der_b64, public_der_b64
+
+
 def main():
     print("=" * 60)
     print("生成 KMS 密钥")
@@ -141,6 +174,18 @@ def main():
     # 生成数据库加密密钥（AES-256-GCM）
     db_enc_key = generate_aes_raw_key()
 
+    # 生成支付宝 RSA2048 密钥对（PKCS8 DER 格式）
+    alipay_private_key_der = None
+    alipay_public_key_der = None
+    if HAS_CRYPTOGRAPHY:
+        try:
+            alipay_private_key_der, alipay_public_key_der = generate_alipay_rsa_keypair()
+            print("✅ 生成支付宝 RSA2048 密钥对（PKCS8 DER 格式）")
+        except Exception as e:
+            print(f"⚠️  生成支付宝密钥失败: {e}")
+    else:
+        print("⚠️  跳过支付宝密钥生成（需要 cryptography 库）")
+
     # JSON 序列化后 base64url 编码
     jws_key_json = json.dumps(jws_key, separators=(",", ":"))
     jwe_key_json = json.dumps(jwe_key, separators=(",", ":"))
@@ -161,23 +206,32 @@ def main():
     print("[kms.database]")
     print(f'enc-key = "{db_enc_key}"')
     print()
+    if alipay_private_key_der:
+        print("# 支付宝小程序配置")
+        print("[idps.alipay]")
+        print('appid = ""  # 支付宝小程序 AppID')
+        print(f'secret = "{alipay_private_key_der}"  # 应用私钥（PKCS8 DER Base64，用于签名请求）')
+        print('verify-key = ""  # 支付宝公钥（PKCS8 DER Base64，上传应用公钥后支付宝返回，用于验证响应签名）')
+        print()
+        if alipay_public_key_der:
+            print("注意：上面的 public-key 需要上传下面的应用公钥到支付宝开放平台后，")
+            print("      支付宝会返回对应的支付宝公钥，将返回的公钥填入 public-key 字段")
+            print()
     print("-" * 60)
     print()
 
-    # 提取公钥
-    public_jwk = {
-        "kty": jws_key["kty"],
-        "crv": jws_key["crv"],
-        "kid": jws_key["kid"],
-        "use": jws_key["use"],
-        "alg": jws_key["alg"],
-        "x": jws_key["x"],
-    }
-
-    public_jwk_json = json.dumps(public_jwk, indent=2)
-    print("签名公钥（JWKS 端点返回，可公开）：")
-    print(public_jwk_json)
-    print()
+    # 输出支付宝密钥
+    if alipay_public_key_der:
+        print("=" * 60)
+        print("支付宝应用公钥（需要上传到支付宝开放平台）：")
+        print("=" * 60)
+        print()
+        print("请将以下应用公钥上传到支付宝开放平台 -> 开发信息 -> 接口加签方式 -> 设置公钥")
+        print("上传后，支付宝会返回对应的支付宝公钥，将返回的公钥填入 config.toml 的 public-key 字段")
+        print("-" * 60)
+        print(alipay_public_key_der)
+        print("-" * 60)
+        print()
 
     print("=" * 60)
     print("✅ 密钥生成完成")

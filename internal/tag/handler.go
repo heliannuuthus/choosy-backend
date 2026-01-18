@@ -1,24 +1,23 @@
-package handlers
+package tag
 
 import (
 	"net/http"
 
-	"choosy-backend/internal/models"
-	"choosy-backend/internal/tag"
+	"zwei-backend/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-// TagHandler 标签处理器
-type TagHandler struct {
-	service *tag.Service
+// Handler 标签处理器
+type Handler struct {
+	service *Service
 }
 
-// NewTagHandler 创建标签处理器
-func NewTagHandler(db *gorm.DB) *TagHandler {
-	return &TagHandler{
-		service: tag.NewService(db),
+// NewHandler 创建标签处理器
+func NewHandler(db *gorm.DB) *Handler {
+	return &Handler{
+		service: NewService(db),
 	}
 }
 
@@ -37,11 +36,11 @@ type TagValueResponse struct {
 // @Param recipe_id query string false "菜谱ID（获取特定菜谱的标签，仅用于 cuisine/flavor/scene）"
 // @Success 200 {array} TagValueResponse
 // @Router /api/tags [get]
-func (h *TagHandler) ListTags(c *gin.Context) {
+func (h *Handler) ListTags(c *gin.Context) {
 	tagType := c.Query("type")
 	recipeID := c.Query("recipe_id")
 
-	var results []tag.TagValue
+	var results []TagValue
 	var err error
 
 	if tagType != "" {
@@ -85,7 +84,7 @@ func (h *TagHandler) ListTags(c *gin.Context) {
 
 	response := make([]TagValueResponse, len(results))
 	for i, r := range results {
-		response[i] = TagValueResponse{Value: r.Value, Label: r.Label}
+		response[i] = TagValueResponse(r)
 	}
 	c.JSON(http.StatusOK, response)
 }
@@ -98,7 +97,7 @@ func (h *TagHandler) ListTags(c *gin.Context) {
 // @Param type path string true "标签类型: cuisine/flavor/scene/taboo/allergy"
 // @Success 200 {array} TagValueResponse
 // @Router /api/tags/{type} [get]
-func (h *TagHandler) GetTagsByType(c *gin.Context) {
+func (h *Handler) GetTagsByType(c *gin.Context) {
 	tagTypeStr := c.Param("type")
 	tagType := models.TagType(tagTypeStr)
 
@@ -108,7 +107,7 @@ func (h *TagHandler) GetTagsByType(c *gin.Context) {
 		return
 	}
 
-	var results []tag.TagValue
+	var results []TagValue
 	var err error
 
 	// 选项类型（taboo/allergy）只返回选项
@@ -126,7 +125,7 @@ func (h *TagHandler) GetTagsByType(c *gin.Context) {
 
 	response := make([]TagValueResponse, len(results))
 	for i, r := range results {
-		response[i] = TagValueResponse{Value: r.Value, Label: r.Label}
+		response[i] = TagValueResponse(r)
 	}
 	c.JSON(http.StatusOK, response)
 }
@@ -149,7 +148,7 @@ type CreateTagRequest struct {
 // @Success 201 {object} TagValueResponse
 // @Failure 400 {object} map[string]string
 // @Router /api/tags [post]
-func (h *TagHandler) CreateTag(c *gin.Context) {
+func (h *Handler) CreateTag(c *gin.Context) {
 	var req CreateTagRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"detail": err.Error()})
@@ -211,7 +210,7 @@ type UpdateTagRequest struct {
 // @Success 200 {object} TagValueResponse
 // @Failure 400 {object} map[string]string
 // @Router /api/tags/{type}/{value} [put]
-func (h *TagHandler) UpdateTag(c *gin.Context) {
+func (h *Handler) UpdateTag(c *gin.Context) {
 	tagTypeStr := c.Param("type")
 	value := c.Param("value")
 	recipeID := c.Query("recipe_id")
@@ -260,7 +259,7 @@ func (h *TagHandler) UpdateTag(c *gin.Context) {
 // @Success 204 "No Content"
 // @Failure 400 {object} map[string]string
 // @Router /api/tags/{type}/{value} [delete]
-func (h *TagHandler) DeleteTag(c *gin.Context) {
+func (h *Handler) DeleteTag(c *gin.Context) {
 	tagTypeStr := c.Param("type")
 	value := c.Param("value")
 	recipeID := c.Query("recipe_id")
@@ -294,7 +293,7 @@ func (h *TagHandler) DeleteTag(c *gin.Context) {
 }
 
 // isValidTagType 验证标签类型是否有效
-func (h *TagHandler) isValidTagType(tagType models.TagType, isOption bool) bool {
+func (h *Handler) isValidTagType(tagType models.TagType, isOption bool) bool {
 	allTypes := []models.TagType{
 		models.TagTypeCuisine,
 		models.TagTypeFlavor,
@@ -325,7 +324,7 @@ func (h *TagHandler) isValidTagType(tagType models.TagType, isOption bool) bool 
 // @Success 200 {array} TagValueResponse
 // @Router /api/tags/cuisines [get]
 // @Deprecated 使用 GET /api/tags?type=cuisine 替代
-func (h *TagHandler) GetCuisines(c *gin.Context) {
+func (h *Handler) GetCuisines(c *gin.Context) {
 	results, err := h.service.GetDistinctTagValues(models.TagTypeCuisine)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"detail": err.Error()})
@@ -334,7 +333,7 @@ func (h *TagHandler) GetCuisines(c *gin.Context) {
 
 	response := make([]TagValueResponse, len(results))
 	for i, r := range results {
-		response[i] = TagValueResponse{Value: r.Value, Label: r.Label}
+		response[i] = TagValueResponse(r)
 	}
 	c.JSON(http.StatusOK, response)
 }
@@ -346,7 +345,7 @@ func (h *TagHandler) GetCuisines(c *gin.Context) {
 // @Success 200 {array} TagValueResponse
 // @Router /api/tags/flavors [get]
 // @Deprecated 使用 GET /api/tags?type=flavor 替代
-func (h *TagHandler) GetFlavors(c *gin.Context) {
+func (h *Handler) GetFlavors(c *gin.Context) {
 	results, err := h.service.GetDistinctTagValues(models.TagTypeFlavor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"detail": err.Error()})
@@ -355,7 +354,7 @@ func (h *TagHandler) GetFlavors(c *gin.Context) {
 
 	response := make([]TagValueResponse, len(results))
 	for i, r := range results {
-		response[i] = TagValueResponse{Value: r.Value, Label: r.Label}
+		response[i] = TagValueResponse(r)
 	}
 	c.JSON(http.StatusOK, response)
 }
@@ -367,7 +366,7 @@ func (h *TagHandler) GetFlavors(c *gin.Context) {
 // @Success 200 {array} TagValueResponse
 // @Router /api/tags/scenes [get]
 // @Deprecated 使用 GET /api/tags?type=scene 替代
-func (h *TagHandler) GetScenes(c *gin.Context) {
+func (h *Handler) GetScenes(c *gin.Context) {
 	results, err := h.service.GetDistinctTagValues(models.TagTypeScene)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"detail": err.Error()})
@@ -376,7 +375,7 @@ func (h *TagHandler) GetScenes(c *gin.Context) {
 
 	response := make([]TagValueResponse, len(results))
 	for i, r := range results {
-		response[i] = TagValueResponse{Value: r.Value, Label: r.Label}
+		response[i] = TagValueResponse(r)
 	}
 	c.JSON(http.StatusOK, response)
 }

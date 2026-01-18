@@ -1,8 +1,8 @@
 package preference
 
 import (
-	"choosy-backend/internal/models"
-	"choosy-backend/internal/tag"
+	"zwei-backend/internal/models"
+	"zwei-backend/internal/tag"
 
 	"sync"
 

@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"choosy-backend/internal/config"
+	"zwei-backend/internal/config"
 
 	"github.com/gin-gonic/gin"
 )

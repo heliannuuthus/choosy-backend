@@ -1,18 +1,18 @@
 package auth
 
 import (
-	"bytes"
-	"encoding/json"
+	"crypto/rand"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
+	"math/big"
+	"time"
 
-	"github.com/tidwall/gjson"
-
-	"choosy-backend/internal/config"
-	"choosy-backend/internal/logger"
+	"zwei-backend/internal/config"
+	"zwei-backend/internal/idp/alipay"
+	"zwei-backend/internal/idp/tt"
+	"zwei-backend/internal/idp/wechat"
+	"zwei-backend/internal/logger"
+	"zwei-backend/internal/models"
 
 	"gorm.io/gorm"
 )
@@ -27,202 +27,258 @@ func NewService(db *gorm.DB) *Service {
 	return &Service{db: db}
 }
 
-// WxCode2Session 调用微信 code2session 接口
-func (s *Service) WxCode2Session(code string) (*WxCode2SessionResponse, error) {
-	appid := config.GetString("idps.wxmp.appid")
-	secret := config.GetString("idps.wxmp.secret")
-	if appid == "" || secret == "" {
-		return nil, errors.New("微信小程序 IdP 未配置")
-	}
+// Login 统一登录入口
+// idp: 身份提供方，如 wechat:mp, tt:mp, alipay:mp
+// code: 平台返回的授权码
+func (s *Service) Login(idp, code string) (*TokenPair, error) {
+	logger.Infof("[Auth] 开始登录流程 - IDP: %s", idp)
 
-	logger.Infof("[Auth] 微信登录请求 - Code: %s...", code[:min(len(code), 10)])
+	var tOpenID, unionID string
+	var err error
 
-	params := url.Values{}
-	params.Set("appid", appid)
-	params.Set("secret", secret)
-	params.Set("js_code", code)
-	params.Set("grant_type", "authorization_code")
-
-	reqURL := "https://api.weixin.qq.com/sns/jscode2session?" + params.Encode()
-
-	resp, err := http.Get(reqURL)
-	if err != nil {
-		logger.Errorf("[Auth] 请求微信接口失败: %v", err)
-		return nil, fmt.Errorf("请求微信接口失败: %w", err)
-	}
-	defer resp.Body.Close()
-
-	var result WxCode2SessionResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		logger.Errorf("[Auth] 解析微信响应失败: %v", err)
-		return nil, fmt.Errorf("解析微信响应失败: %w", err)
-	}
-
-	if result.ErrCode != 0 {
-		logger.Errorf("[Auth] 微信登录失败 - ErrCode: %d, ErrMsg: %s", result.ErrCode, result.ErrMsg)
-		return nil, fmt.Errorf("微信登录失败: %s", result.ErrMsg)
-	}
-
-	unionID := "(无)"
-	if result.UnionID != "" {
+	switch idp {
+	case IDPWechatMP:
+		client := wechat.NewClient()
+		result, err := client.Code2Session(code)
+		if err != nil {
+			return nil, fmt.Errorf("微信登录失败: %w", err)
+		}
+		tOpenID = result.OpenID
 		unionID = result.UnionID
-	}
-	logger.Infof("[Auth] 微信登录成功 - T_OpenID: %s, UnionID: %s", result.OpenID, unionID)
 
-	return &result, nil
+	case IDPTTMP:
+		client := tt.NewClient()
+		result, err := client.Code2Session(code)
+		if err != nil {
+			return nil, fmt.Errorf("抖音登录失败: %w", err)
+		}
+		tOpenID = result.OpenID
+		unionID = result.UnionID
+
+	case IDPAlipayMP:
+		client := alipay.NewClient()
+		result, err := client.Code2Session(code)
+		if err != nil {
+			return nil, fmt.Errorf("支付宝登录失败: %w", err)
+		}
+		tOpenID = result.OpenID
+		unionID = result.UnionID
+
+	default:
+		return nil, fmt.Errorf("不支持的平台: %s", idp)
+	}
+
+	// 生成默认昵称和头像
+	nickname := generateRandomNickname()
+	avatar := generateRandomAvatar(tOpenID)
+
+	// 查找或创建用户
+	user, err := s.selectOrCreateUser(idp, tOpenID, unionID, nickname, avatar)
+	if err != nil {
+		return nil, fmt.Errorf("用户管理失败: %w", err)
+	}
+
+	// 生成 token
+	return s.generateTokenPair(user, idp)
 }
 
-// GenerateToken 生成 token（微信小程序登录）
-func (s *Service) GenerateToken(wxResult *WxCode2SessionResponse, nickname, avatar string) (*TokenPair, error) {
-	params := &LoginParams{
-		IDP:      IDPWechatMP,
-		TOpenID:  wxResult.OpenID,
-		UnionID:  wxResult.UnionID,
-		Nickname: nickname,
-		Avatar:   avatar,
-	}
-	return GenerateTokenPair(s.db, params)
-}
+// selectOrCreateUser 查找或创建用户（支持 unionid 关联）
+func (s *Service) selectOrCreateUser(idp, tOpenID, unionID, nickname, avatar string) (*models.User, error) {
+	logger.Infof("[Auth] 开始查询/创建用户 - IDP: %s, T_OpenID: %s, UnionID: %s", idp, tOpenID, unionID)
 
-// TtCode2Session 调用 TT code2session 接口
-func (s *Service) TtCode2Session(code string) (*TtCode2SessionResponse, error) {
-	appid := config.GetString("idps.tt.appid")
-	secret := config.GetString("idps.tt.secret")
-	if appid == "" || secret == "" {
-		return nil, errors.New("TT 小程序 IdP 未配置")
-	}
+	now := time.Now()
 
-	logger.Infof("[Auth] TT 登录请求 - Code: %s...", code[:min(len(code), 10)])
+	// 1. 先查当前 idp + t_openid 是否存在
+	var identity models.UserIdentity
+	err := s.db.Where("idp = ? AND t_openid = ?", idp, tOpenID).First(&identity).Error
 
-	// 抖音 API 使用 POST 请求，body 为 JSON
-	reqBody := map[string]string{
-		"appid":  appid,
-		"secret": secret,
-		"code":   code,
-	}
-	reqBodyBytes, err := json.Marshal(reqBody)
-	if err != nil {
-		logger.Errorf("[Auth] 构建 TT 请求体失败: %v", err)
-		return nil, fmt.Errorf("构建 TT 请求体失败: %w", err)
+	if err == nil {
+		// 找到了，直接查用户
+		var user models.User
+		if err := s.db.Where("openid = ?", identity.OpenID).First(&user).Error; err != nil {
+			logger.Errorf("[Auth] 用户身份存在但用户不存在 - OpenID: %s, Error: %v", identity.OpenID, err)
+			return nil, err
+		}
+
+		// 更新最后登录时间
+		s.db.Model(&user).Update("last_login_at", now)
+
+		logger.Infof("[Auth] 找到现有用户 - OpenID: %s, IDP: %s, Nickname: %s", user.OpenID, idp, user.Nickname)
+		return &user, nil
 	}
 
-	reqURL := "https://developer.toutiao.com/api/apps/v2/jscode2session"
-
-	req, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(reqBodyBytes))
-	if err != nil {
-		logger.Errorf("[Auth] 创建 TT 请求失败: %v", err)
-		return nil, fmt.Errorf("创建 TT 请求失败: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		logger.Errorf("[Auth] 请求 TT 接口失败: %v", err)
-		return nil, fmt.Errorf("请求 TT 接口失败: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// 先检查 HTTP 状态码
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		logger.Errorf("[Auth] TT API 返回非 200 状态码: %d, 响应: %s", resp.StatusCode, string(bodyBytes))
-		return nil, fmt.Errorf("TT API 请求失败: HTTP %d", resp.StatusCode)
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		logger.Errorf("[Auth] 查询用户身份失败 - IDP: %s, T_OpenID: %s, Error: %v", idp, tOpenID, err)
+		return nil, err
 	}
 
-	// 读取响应体
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		logger.Errorf("[Auth] 读取 TT 响应失败: %v", err)
-		return nil, fmt.Errorf("读取 TT 响应失败: %w", err)
-	}
-
-	logger.Infof("[Auth] TT API 原始响应: %s", string(bodyBytes))
-
-	// 使用 gjson 快速检查错误码
-	errNo := gjson.GetBytes(bodyBytes, "err_no").Int()
-	errTips := gjson.GetBytes(bodyBytes, "err_tips").String()
-
-	// 如果存在错误，直接返回
-	if errNo != 0 {
-		logger.Errorf("[Auth] TT 登录失败 - ErrNo: %d, ErrTips: %s", errNo, errTips)
-		return nil, fmt.Errorf("TT 登录失败: %s", errTips)
-	}
-
-	// 检查 data 字段是否存在且不为 null
-	dataRaw := gjson.GetBytes(bodyBytes, "data")
-	if !dataRaw.Exists() || dataRaw.Raw == "null" {
-		logger.Errorf("[Auth] TT 响应 data 字段为空或 null")
-		return nil, fmt.Errorf("TT 登录失败: 响应数据为空")
-	}
-
-	// 使用 gjson 提取 data 字段中的值
-	openID := gjson.GetBytes(bodyBytes, "data.openid").String()
-	sessionKey := gjson.GetBytes(bodyBytes, "data.session_key").String()
-	unionID := gjson.GetBytes(bodyBytes, "data.unionid").String()
-
-	// 验证必要字段
-	if openID == "" || sessionKey == "" {
-		logger.Errorf("[Auth] TT 响应缺少必要字段 - openid: %s, session_key: %s", openID, sessionKey)
-		return nil, fmt.Errorf("TT 登录失败: 响应数据不完整")
-	}
-
-	unionIDDisplay := "(无)"
+	// 2. 没找到，如果有 unionid，尝试通过 unionid 关联
+	var existingOpenID string
 	if unionID != "" {
-		unionIDDisplay = unionID
+		unionIDP := getUnionIDP(idp)
+		var unionIdentity models.UserIdentity
+		err := s.db.Where("idp = ? AND t_openid = ?", unionIDP, unionID).First(&unionIdentity).Error
+		if err == nil {
+			existingOpenID = unionIdentity.OpenID
+			logger.Infof("[Auth] 通过 UnionID 找到已有用户 - OpenID: %s, UnionIDP: %s", existingOpenID, unionIDP)
+		}
 	}
-	logger.Infof("[Auth] TT 登录成功 - T_OpenID: %s, UnionID: %s", openID, unionIDDisplay)
 
-	return &TtCode2SessionResponse{
-		OpenID:     openID,
-		SessionKey: sessionKey,
-		UnionID:    unionID,
+	// 3. 开始事务：创建用户或绑定身份
+	var user models.User
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		if existingOpenID != "" {
+			// 已有用户，只需绑定新身份
+			if err := tx.Where("openid = ?", existingOpenID).First(&user).Error; err != nil {
+				return err
+			}
+		} else {
+			// 创建新用户
+			user = models.User{
+				OpenID:      GenerateID(),
+				Nickname:    nickname,
+				Avatar:      avatar,
+				Gender:      0,
+				Status:      0,
+				LastLoginAt: &now,
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			}
+			if err := tx.Create(&user).Error; err != nil {
+				return err
+			}
+			logger.Infof("[Auth] 创建新用户 - OpenID: %s, Nickname: %s", user.OpenID, user.Nickname)
+		}
+
+		// 插入当前 idp 身份
+		newIdentity := models.UserIdentity{
+			OpenID:    user.OpenID,
+			IDP:       idp,
+			TOpenID:   tOpenID,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		if err := tx.Create(&newIdentity).Error; err != nil {
+			return err
+		}
+		logger.Infof("[Auth] 绑定身份 - OpenID: %s, IDP: %s, T_OpenID: %s", user.OpenID, idp, tOpenID)
+
+		// 如果有 unionid 且之前没有记录，也插入
+		if unionID != "" && existingOpenID == "" {
+			unionIDP := getUnionIDP(idp)
+			unionIdentity := models.UserIdentity{
+				OpenID:    user.OpenID,
+				IDP:       unionIDP,
+				TOpenID:   unionID,
+				CreatedAt: now,
+				UpdatedAt: now,
+			}
+			if err := tx.Create(&unionIdentity).Error; err != nil {
+				return err
+			}
+			logger.Infof("[Auth] 绑定 UnionID - OpenID: %s, IDP: %s, UnionID: %s", user.OpenID, unionIDP, unionID)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		logger.Errorf("[Auth] 创建用户/绑定身份失败 - Error: %v", err)
+		return nil, err
+	}
+
+	// 更新最后登录时间（如果是已有用户绑定新身份）
+	if existingOpenID != "" {
+		s.db.Model(&user).Update("last_login_at", now)
+	}
+
+	return &user, nil
+}
+
+// generateTokenPair 生成 token 对
+func (s *Service) generateTokenPair(user *models.User, idp string) (*TokenPair, error) {
+	logger.Infof("[Auth] 开始生成 Token 对 - OpenID: %s, IDP: %s", user.OpenID, idp)
+
+	now := time.Now()
+
+	identity := &Identity{
+		OpenID:   user.OpenID,
+		Nickname: user.Nickname,
+		Avatar:   user.Avatar,
+	}
+
+	accessToken, err := CreateAccessToken(identity, idp)
+	if err != nil {
+		logger.Errorf("[Auth] 生成 Access Token 失败 - OpenID: %s, Error: %v", user.OpenID, err)
+		return nil, fmt.Errorf("生成 access_token 失败: %w", err)
+	}
+
+	refreshToken := GenerateRefreshToken()
+	refreshExpiresIn := config.GetInt("auth.refresh-expires-in")
+	expiresAt := now.Add(time.Duration(refreshExpiresIn) * 24 * time.Hour)
+
+	CleanupOldRefreshTokens(s.db, user.OpenID)
+
+	dbToken := models.RefreshToken{
+		OpenID:    user.OpenID,
+		Token:     refreshToken,
+		ExpiresAt: expiresAt,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	if err := s.db.Create(&dbToken).Error; err != nil {
+		logger.Errorf("[Auth] 存储 Refresh Token 失败 - OpenID: %s, Error: %v", user.OpenID, err)
+		return nil, fmt.Errorf("存储 refresh_token 失败: %w", err)
+	}
+
+	logger.Infof("[Auth] Token 对生成成功 - OpenID: %s, Aud: %s:%s, ExpiresIn: %ds",
+		user.OpenID, config.GetString("auth.issuer"), idp, config.GetInt("auth.expires-in"))
+
+	return &TokenPair{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+		ExpiresIn:    config.GetInt("auth.expires-in"),
 	}, nil
 }
 
-// GenerateTokenFromTt 生成 token（TT 小程序登录）
-func (s *Service) GenerateTokenFromTt(ttResult *TtCode2SessionResponse, nickname, avatar string) (*TokenPair, error) {
-	params := &LoginParams{
-		IDP:      IDPTTMP,
-		TOpenID:  ttResult.OpenID,
-		UnionID:  ttResult.UnionID,
-		Nickname: nickname,
-		Avatar:   avatar,
+// getUnionIDP 根据 idp 获取对应的 unionid idp
+func getUnionIDP(idp string) string {
+	switch idp {
+	case IDPWechatMP, IDPWechatOA:
+		return IDPWechatUnionID
+	case IDPTTMP:
+		return IDPTTUnionID
+	default:
+		return idp + ":unionid"
 	}
-	return GenerateTokenPair(s.db, params)
 }
 
-// AlipayCode2Session 调用支付宝 code2session 接口
-func (s *Service) AlipayCode2Session(code string) (*AlipayCode2SessionResponse, error) {
-	appid := config.GetString("idps.alipay.appid")
-	secret := config.GetString("idps.alipay.secret")
-	if appid == "" || secret == "" {
-		return nil, errors.New("支付宝小程序 IdP 未配置")
-	}
+// generateRandomNickname 生成随机昵称
+func generateRandomNickname() string {
+	adjectives := []string{"快乐的", "聪明的", "勇敢的", "温柔的", "活泼的", "安静的", "优雅的", "幽默的"}
+	nouns := []string{"小猫", "小狗", "小鸟", "小鱼", "小兔", "小熊", "小鹿", "小羊"}
 
-	logger.Infof("[Auth] 支付宝登录请求 - Code: %s...", code[:min(len(code), 10)])
+	adjIndex, _ := rand.Int(rand.Reader, big.NewInt(int64(len(adjectives))))
+	nounIndex, _ := rand.Int(rand.Reader, big.NewInt(int64(len(nouns))))
 
-	// TODO: 支付宝需要签名，这里简化处理，实际需要实现签名逻辑
-	// 支付宝的 code2session 接口比较复杂，需要 RSA 签名
-	// 需要实现以下步骤：
-	// 1. 构建请求参数（app_id, method, format, charset, sign_type, timestamp, version, grant_type, code）
-	// 2. 使用 RSA2 私钥对参数进行签名
-	// 3. POST 请求到 https://openapi.alipay.com/gateway.do
-	// 4. 解析响应获取 openid 和 session_key
-
-	logger.Warnf("[Auth] 支付宝登录暂未完全实现，需要 RSA 签名")
-	return nil, fmt.Errorf("支付宝登录暂未完全实现，需要配置 RSA 密钥和实现签名逻辑")
+	return adjectives[adjIndex.Int64()] + nouns[nounIndex.Int64()] + fmt.Sprintf("%04d", time.Now().Unix()%10000)
 }
 
-// GenerateTokenFromAlipay 生成 token（支付宝小程序登录）
-func (s *Service) GenerateTokenFromAlipay(alipayResult *AlipayCode2SessionResponse, nickname, avatar string) (*TokenPair, error) {
-	params := &LoginParams{
-		IDP:      IDPAlipayMP,
-		TOpenID:  alipayResult.OpenID,
-		UnionID:  alipayResult.UnionID,
-		Nickname: nickname,
-		Avatar:   avatar,
+// generateRandomAvatar 生成随机头像 URL
+func generateRandomAvatar(seed string) string {
+	// 使用 seed 生成一致的随机数
+	hash := 0
+	for _, c := range seed {
+		hash = hash*31 + int(c)
 	}
-	return GenerateTokenPair(s.db, params)
+	if hash < 0 {
+		hash = -hash
+	}
+
+	avatarIndex := hash % 10
+	return fmt.Sprintf("https://api.dicebear.com/7.x/avataaars/svg?seed=%s&size=200", fmt.Sprintf("user%d", avatarIndex))
 }
 
 // VerifyToken 验证 access_token

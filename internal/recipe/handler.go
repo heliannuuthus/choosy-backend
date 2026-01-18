@@ -1,26 +1,26 @@
-package handlers
+package recipe
 
 import (
 	"net/http"
 	"strconv"
 
-	"choosy-backend/internal/models"
-	"choosy-backend/internal/recipe"
-	"choosy-backend/internal/utils"
+	"zwei-backend/internal/models"
+	"zwei-backend/internal/types"
+	"zwei-backend/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-// RecipeHandler 菜谱处理器
-type RecipeHandler struct {
-	service *recipe.Service
+// Handler 菜谱处理器
+type Handler struct {
+	service *Service
 }
 
-// NewRecipeHandler 创建菜谱处理器
-func NewRecipeHandler(db *gorm.DB) *RecipeHandler {
-	return &RecipeHandler{
-		service: recipe.NewService(db),
+// NewHandler 创建菜谱处理器
+func NewHandler(db *gorm.DB) *Handler {
+	return &Handler{
+		service: NewService(db),
 	}
 }
 
@@ -82,23 +82,6 @@ type RecipeUpdateRequest struct {
 	AdditionalNotes  *[]string            `json:"additional_notes"`
 }
 
-type TagsGrouped struct {
-	Cuisines []string `json:"cuisines"`
-	Flavors  []string `json:"flavors"`
-	Scenes   []string `json:"scenes"`
-}
-
-type RecipeListItem struct {
-	ID               string      `json:"id"`
-	Name             string      `json:"name"`
-	Description      *string     `json:"description"`
-	Category         string      `json:"category"`
-	Difficulty       int         `json:"difficulty"`
-	Tags             TagsGrouped `json:"tags"`
-	ImagePath        *string     `json:"image_path"`
-	TotalTimeMinutes *int        `json:"total_time_minutes"`
-}
-
 type RecipeResponse struct {
 	ID               string               `json:"id"`
 	Name             string               `json:"name"`
@@ -107,7 +90,7 @@ type RecipeResponse struct {
 	ImagePath        *string              `json:"image_path"`
 	Category         string               `json:"category"`
 	Difficulty       int                  `json:"difficulty"`
-	Tags             TagsGrouped          `json:"tags"`
+	Tags             types.TagsGrouped    `json:"tags"`
 	Servings         int                  `json:"servings"`
 	PrepTimeMinutes  *int                 `json:"prep_time_minutes"`
 	CookTimeMinutes  *int                 `json:"cook_time_minutes"`
@@ -147,7 +130,7 @@ type CategoryResponse struct {
 // @Success 201 {object} RecipeResponse
 // @Failure 400 {object} map[string]string
 // @Router /api/recipes [post]
-func (h *RecipeHandler) CreateRecipe(c *gin.Context) {
+func (h *Handler) CreateRecipe(c *gin.Context) {
 	var req RecipeCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"detail": err.Error()})
@@ -208,9 +191,9 @@ func (h *RecipeHandler) CreateRecipe(c *gin.Context) {
 // @Param search query string false "搜索关键词"
 // @Param limit query int false "限制数量" default(100)
 // @Param offset query int false "偏移量" default(0)
-// @Success 200 {array} RecipeListItem
+// @Success 200 {array} types.RecipeListItem
 // @Router /api/recipes [get]
-func (h *RecipeHandler) GetRecipes(c *gin.Context) {
+func (h *Handler) GetRecipes(c *gin.Context) {
 	category := c.Query("category")
 	search := c.Query("search")
 
@@ -232,15 +215,15 @@ func (h *RecipeHandler) GetRecipes(c *gin.Context) {
 		return
 	}
 
-	items := make([]RecipeListItem, len(recipes))
+	items := make([]types.RecipeListItem, len(recipes))
 	for i, r := range recipes {
-		items[i] = RecipeListItem{
+		items[i] = types.RecipeListItem{
 			ID:               r.RecipeID,
 			Name:             r.Name,
 			Description:      r.Description,
 			Category:         r.Category,
 			Difficulty:       r.Difficulty,
-			Tags:             GroupTags(r.Tags),
+			Tags:             types.GroupTags(r.Tags),
 			ImagePath:        r.GetImagePath(),
 			TotalTimeMinutes: r.TotalTimeMinutes,
 		}
@@ -257,7 +240,7 @@ func (h *RecipeHandler) GetRecipes(c *gin.Context) {
 // @Success 200 {object} RecipeResponse
 // @Failure 404 {object} map[string]string
 // @Router /api/recipes/{recipe_id} [get]
-func (h *RecipeHandler) GetRecipe(c *gin.Context) {
+func (h *Handler) GetRecipe(c *gin.Context) {
 	id := c.Param("recipe_id")
 
 	recipeModel, err := h.service.GetRecipe(id)
@@ -284,7 +267,7 @@ func (h *RecipeHandler) GetRecipe(c *gin.Context) {
 // @Success 200 {object} RecipeResponse
 // @Failure 404 {object} map[string]string
 // @Router /api/recipes/{recipe_id} [put]
-func (h *RecipeHandler) UpdateRecipe(c *gin.Context) {
+func (h *Handler) UpdateRecipe(c *gin.Context) {
 	id := c.Param("recipe_id")
 
 	var req RecipeUpdateRequest
@@ -382,7 +365,7 @@ func (h *RecipeHandler) UpdateRecipe(c *gin.Context) {
 // @Success 204
 // @Failure 404 {object} map[string]string
 // @Router /api/recipes/{recipe_id} [delete]
-func (h *RecipeHandler) DeleteRecipe(c *gin.Context) {
+func (h *Handler) DeleteRecipe(c *gin.Context) {
 	id := c.Param("recipe_id")
 
 	if err := h.service.DeleteRecipe(id); err != nil {
@@ -399,7 +382,7 @@ func (h *RecipeHandler) DeleteRecipe(c *gin.Context) {
 // @Produce json
 // @Success 200 {array} CategoryResponse
 // @Router /api/recipes/categories/list [get]
-func (h *RecipeHandler) GetCategories(c *gin.Context) {
+func (h *Handler) GetCategories(c *gin.Context) {
 	categories, err := h.service.GetCategories()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"detail": err.Error()})
@@ -429,7 +412,7 @@ func (h *RecipeHandler) GetCategories(c *gin.Context) {
 // @Param recipes body []RecipeCreateRequest true "菜谱列表"
 // @Success 201 {array} RecipeResponse
 // @Router /api/recipes/batch [post]
-func (h *RecipeHandler) CreateRecipesBatch(c *gin.Context) {
+func (h *Handler) CreateRecipesBatch(c *gin.Context) {
 	var reqs []RecipeCreateRequest
 	if err := c.ShouldBindJSON(&reqs); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"detail": err.Error()})
@@ -500,27 +483,7 @@ func (h *RecipeHandler) CreateRecipesBatch(c *gin.Context) {
 	c.JSON(http.StatusCreated, responses)
 }
 
-// GroupTags 将 []models.Tag 按类型分组
-func GroupTags(tags []models.Tag) TagsGrouped {
-	result := TagsGrouped{
-		Cuisines: []string{},
-		Flavors:  []string{},
-		Scenes:   []string{},
-	}
-	for _, t := range tags {
-		switch t.Type {
-		case models.TagTypeCuisine:
-			result.Cuisines = append(result.Cuisines, t.Label)
-		case models.TagTypeFlavor:
-			result.Flavors = append(result.Flavors, t.Label)
-		case models.TagTypeScene:
-			result.Scenes = append(result.Scenes, t.Label)
-		}
-	}
-	return result
-}
-
-func (h *RecipeHandler) toRecipeResponse(r *models.Recipe) *RecipeResponse {
+func (h *Handler) toRecipeResponse(r *models.Recipe) *RecipeResponse {
 	if r == nil {
 		return nil
 	}
@@ -557,7 +520,7 @@ func (h *RecipeHandler) toRecipeResponse(r *models.Recipe) *RecipeResponse {
 		images = []string{}
 	}
 
-	tags := GroupTags(r.Tags)
+	tags := types.GroupTags(r.Tags)
 
 	return &RecipeResponse{
 		ID:               r.RecipeID,

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"choosy-backend/internal/config"
-	"choosy-backend/internal/logger"
+	"zwei-backend/internal/config"
+	"zwei-backend/internal/logger"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 )

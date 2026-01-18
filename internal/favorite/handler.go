@@ -1,25 +1,25 @@
-package handlers
+package favorite
 
 import (
 	"net/http"
 	"strconv"
 
-	"choosy-backend/internal/auth"
-	"choosy-backend/internal/favorite"
+	"zwei-backend/internal/auth"
+	"zwei-backend/internal/types"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-// FavoriteHandler 收藏处理器
-type FavoriteHandler struct {
-	service *favorite.Service
+// Handler 收藏处理器
+type Handler struct {
+	service *Service
 }
 
-// NewFavoriteHandler 创建收藏处理器
-func NewFavoriteHandler(db *gorm.DB) *FavoriteHandler {
-	return &FavoriteHandler{
-		service: favorite.NewService(db),
+// NewHandler 创建收藏处理器
+func NewHandler(db *gorm.DB) *Handler {
+	return &Handler{
+		service: NewService(db),
 	}
 }
 
@@ -33,9 +33,9 @@ type FavoriteResponse struct {
 }
 
 type FavoriteListItem struct {
-	RecipeID  string          `json:"recipe_id"`
-	CreatedAt string          `json:"created_at"`
-	Recipe    *RecipeListItem `json:"recipe,omitempty"`
+	RecipeID  string                `json:"recipe_id"`
+	CreatedAt string                `json:"created_at"`
+	Recipe    *types.RecipeListItem `json:"recipe,omitempty"`
 }
 
 type FavoriteListResponse struct {
@@ -65,7 +65,7 @@ type BatchCheckResponse struct {
 // @Failure 400 {object} map[string]string
 // @Failure 401 {object} map[string]string
 // @Router /api/user/favorites [post]
-func (h *FavoriteHandler) AddFavorite(c *gin.Context) {
+func (h *Handler) AddFavorite(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"detail": "未登录"})
@@ -100,7 +100,7 @@ func (h *FavoriteHandler) AddFavorite(c *gin.Context) {
 // @Success 204
 // @Failure 401 {object} map[string]string
 // @Router /api/user/favorites/{recipe_id} [delete]
-func (h *FavoriteHandler) RemoveFavorite(c *gin.Context) {
+func (h *Handler) RemoveFavorite(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"detail": "未登录"})
@@ -127,7 +127,7 @@ func (h *FavoriteHandler) RemoveFavorite(c *gin.Context) {
 // @Success 200 {object} CheckFavoriteResponse
 // @Failure 401 {object} map[string]string
 // @Router /api/user/favorites/{recipe_id}/check [get]
-func (h *FavoriteHandler) CheckFavorite(c *gin.Context) {
+func (h *Handler) CheckFavorite(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"detail": "未登录"})
@@ -160,7 +160,7 @@ func (h *FavoriteHandler) CheckFavorite(c *gin.Context) {
 // @Success 200 {object} FavoriteListResponse
 // @Failure 401 {object} map[string]string
 // @Router /api/user/favorites [get]
-func (h *FavoriteHandler) GetFavorites(c *gin.Context) {
+func (h *Handler) GetFavorites(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"detail": "未登录"})
@@ -199,13 +199,13 @@ func (h *FavoriteHandler) GetFavorites(c *gin.Context) {
 		}
 
 		if f.Recipe != nil {
-			item.Recipe = &RecipeListItem{
+			item.Recipe = &types.RecipeListItem{
 				ID:               f.Recipe.RecipeID,
 				Name:             f.Recipe.Name,
 				Description:      f.Recipe.Description,
 				Category:         f.Recipe.Category,
 				Difficulty:       f.Recipe.Difficulty,
-				Tags:             GroupTags(f.Recipe.Tags),
+				Tags:             types.GroupTags(f.Recipe.Tags),
 				ImagePath:        f.Recipe.GetImagePath(),
 				TotalTimeMinutes: f.Recipe.TotalTimeMinutes,
 			}
@@ -229,7 +229,7 @@ func (h *FavoriteHandler) GetFavorites(c *gin.Context) {
 // @Success 200 {object} BatchCheckResponse
 // @Failure 401 {object} map[string]string
 // @Router /api/user/favorites/batch-check [post]
-func (h *FavoriteHandler) BatchCheckFavorites(c *gin.Context) {
+func (h *Handler) BatchCheckFavorites(c *gin.Context) {
 	user, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"detail": "未登录"})
