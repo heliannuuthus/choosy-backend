@@ -2,6 +2,7 @@ package hermes
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -177,7 +178,7 @@ func (h *Handler) UpdateApplication(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
 }
 
-// SetApplicationServiceRelations POST /hermes/applications/:app_id/services/:service_id/relations
+// SetApplicationServiceRelations POST /hermes/applications/:app_id/services/:service_id/applicable
 func (h *Handler) SetApplicationServiceRelations(c *gin.Context) {
 	appID := c.Param("app_id")
 	serviceID := c.Param("service_id")
@@ -198,7 +199,7 @@ func (h *Handler) SetApplicationServiceRelations(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "设置成功"})
 }
 
-// GetApplicationServiceRelations GET /hermes/applications/:app_id/relations
+// GetApplicationServiceRelations GET /hermes/applications/:app_id/applicable
 func (h *Handler) GetApplicationServiceRelations(c *gin.Context) {
 	appID := c.Param("app_id")
 	relations, err := h.service.GetApplicationServiceRelations(c.Request.Context(), appID)
@@ -258,6 +259,108 @@ func (h *Handler) ListRelationships(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, rels)
+}
+
+// UpdateRelationship PUT /hermes/relationships
+func (h *Handler) UpdateRelationship(c *gin.Context) {
+	var req RelationshipUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	rel, err := h.service.UpdateRelationship(c.Request.Context(), &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, rel)
+}
+
+// ==================== App Service Relationship 相关（RESTful 风格）====================
+
+// ListAppServiceRelationships GET /hermes/applications/:app_id/services/:service_id/relationships
+func (h *Handler) ListAppServiceRelationships(c *gin.Context) {
+	appID := c.Param("app_id")
+	serviceID := c.Param("service_id")
+	subjectType := c.Query("subject_type")
+	subjectID := c.Query("subject_id")
+
+	rels, err := h.service.ListAppServiceRelationships(c.Request.Context(), appID, serviceID, subjectType, subjectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, rels)
+}
+
+// CreateAppServiceRelationship POST /hermes/applications/:app_id/services/:service_id/relationships
+func (h *Handler) CreateAppServiceRelationship(c *gin.Context) {
+	appID := c.Param("app_id")
+	serviceID := c.Param("service_id")
+
+	var req AppServiceRelationshipCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	rel, err := h.service.CreateAppServiceRelationship(c.Request.Context(), appID, serviceID, &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, rel)
+}
+
+// UpdateAppServiceRelationship PUT /hermes/applications/:app_id/services/:service_id/relationships/:relationship_id
+func (h *Handler) UpdateAppServiceRelationship(c *gin.Context) {
+	appID := c.Param("app_id")
+	serviceID := c.Param("service_id")
+	relationshipIDStr := c.Param("relationship_id")
+
+	relationshipID, err := strconv.ParseUint(relationshipIDStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid relationship_id"})
+		return
+	}
+
+	var req AppServiceRelationshipUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	rel, err := h.service.UpdateAppServiceRelationship(c.Request.Context(), appID, serviceID, uint(relationshipID), &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, rel)
+}
+
+// DeleteAppServiceRelationship DELETE /hermes/applications/:app_id/services/:service_id/relationships/:relationship_id
+func (h *Handler) DeleteAppServiceRelationship(c *gin.Context) {
+	appID := c.Param("app_id")
+	serviceID := c.Param("service_id")
+	relationshipIDStr := c.Param("relationship_id")
+
+	relationshipID, err := strconv.ParseUint(relationshipIDStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid relationship_id"})
+		return
+	}
+
+	if err := h.service.DeleteAppServiceRelationship(c.Request.Context(), appID, serviceID, uint(relationshipID)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
 // ==================== Group 相关 ====================

@@ -15,9 +15,9 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-// @title Choosy API
+// @title Helios API
 // @version 1.0
-// @description 菜谱管理系统后端 API
+// @description Helios 统一后端 API - 提供认证、业务和身份与访问管理服务
 
 // @host localhost:18000
 // @BasePath /api
@@ -239,16 +239,23 @@ func main() {
 			applications.POST("", app.HermesHandler.CreateApplication)
 			applications.GET("/:app_id", app.HermesHandler.GetApplication)
 			applications.PUT("/:app_id", app.HermesHandler.UpdateApplication)
-			applications.GET("/:app_id/relations", app.HermesHandler.GetApplicationServiceRelations)
-			applications.POST("/:app_id/services/:service_id/relations", app.HermesHandler.SetApplicationServiceRelations)
+			applications.GET("/:app_id/applicable", app.HermesHandler.GetApplicationServiceRelations)
+			applications.POST("/:app_id/services/:service_id/applicable", app.HermesHandler.SetApplicationServiceRelations)
+
+			// 应用下的服务关系管理（RESTful 风格）
+			appServices := applications.Group("/:app_id/services/:service_id")
+			{
+				appServices.GET("/relationships", app.HermesHandler.ListAppServiceRelationships)
+				appServices.POST("/relationships", app.HermesHandler.CreateAppServiceRelationship)
+				appServices.PUT("/relationships/:relationship_id", app.HermesHandler.UpdateAppServiceRelationship)
+				appServices.DELETE("/relationships/:relationship_id", app.HermesHandler.DeleteAppServiceRelationship)
+			}
 		}
 
-		// 关系管理
+		// 关系管理（通用查询接口，保留向后兼容）
 		relationships := hermes.Group("/relationships")
 		{
 			relationships.GET("", app.HermesHandler.ListRelationships)
-			relationships.POST("", app.HermesHandler.CreateRelationship)
-			relationships.DELETE("", app.HermesHandler.DeleteRelationship)
 		}
 
 		// 组管理

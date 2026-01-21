@@ -62,6 +62,34 @@ type RelationshipDeleteRequest struct {
 	ObjectID    string `json:"object_id" binding:"required"`
 }
 
+// RelationshipUpdateRequest 更新关系请求
+type RelationshipUpdateRequest struct {
+	ServiceID   string  `json:"service_id" binding:"required"`
+	SubjectType string  `json:"subject_type" binding:"required"`
+	SubjectID   string  `json:"subject_id" binding:"required"`
+	Relation    string  `json:"relation" binding:"required"` // 旧的关系类型（用于定位）
+	ObjectType  string  `json:"object_type" binding:"required"`
+	ObjectID    string  `json:"object_id" binding:"required"`
+	NewRelation *string `json:"new_relation,omitempty"` // 新的关系类型（可选）
+	ExpiresAt   *string `json:"expires_at,omitempty"`   // 新的过期时间（可选，ISO 8601 格式，传 null 表示清除过期时间）
+}
+
+// AppServiceRelationshipCreateRequest 在应用服务下创建关系请求（RESTful 风格）
+type AppServiceRelationshipCreateRequest struct {
+	SubjectType string  `json:"subject_type" binding:"required"` // user/group/application
+	SubjectID   string  `json:"subject_id" binding:"required"`
+	Relation    string  `json:"relation" binding:"required"`
+	ObjectType  string  `json:"object_type" binding:"required"`
+	ObjectID    string  `json:"object_id" binding:"required"`
+	ExpiresAt   *string `json:"expires_at,omitempty"` // ISO 8601 格式
+}
+
+// AppServiceRelationshipUpdateRequest 在应用服务下更新关系请求（RESTful 风格）
+type AppServiceRelationshipUpdateRequest struct {
+	NewRelation *string `json:"new_relation,omitempty"` // 新的关系类型（可选）
+	ExpiresAt   *string `json:"expires_at,omitempty"`   // 新的过期时间（可选，ISO 8601 格式，传空字符串表示清除过期时间）
+}
+
 // GroupCreateRequest 创建组请求
 type GroupCreateRequest struct {
 	GroupID     string  `json:"group_id" binding:"required"`

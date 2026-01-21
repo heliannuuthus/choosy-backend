@@ -390,6 +390,234 @@ func (s *Service) ListRelationships(ctx context.Context, serviceID, subjectType,
 	return rels, nil
 }
 
+// UpdateRelationship 更新关系
+func (s *Service) UpdateRelationship(ctx context.Context, req *RelationshipUpdateRequest) (*models.Relationship, error) {
+	// 1. 查找关系
+	var rel models.Relationship
+	if err := s.db.WithContext(ctx).Where(
+		"service_id = ? AND subject_type = ? AND subject_id = ? AND relation = ? AND object_type = ? AND object_id = ?",
+		req.ServiceID, req.SubjectType, req.SubjectID, req.Relation, req.ObjectType, req.ObjectID,
+	).First(&rel).Error; err != nil {
+		return nil, fmt.Errorf("关系不存在: %w", err)
+	}
+
+	// 2. 构建更新字段
+	updates := make(map[string]interface{})
+
+	// 更新关系类型（如果提供）
+	if req.NewRelation != nil && *req.NewRelation != "" {
+		updates["relation"] = *req.NewRelation
+	}
+
+	// 更新过期时间（如果提供）
+	if req.ExpiresAt != nil {
+		if *req.ExpiresAt == "" {
+			// 传空字符串表示清除过期时间
+			updates["expires_at"] = nil
+		} else {
+			// 解析 ISO 8601 格式的过期时间
+			exp, err := time.Parse(time.RFC3339, *req.ExpiresAt)
+			if err != nil {
+				return nil, fmt.Errorf("解析过期时间失败: %w", err)
+			}
+			updates["expires_at"] = exp
+		}
+	}
+
+	// 3. 如果没有要更新的字段，直接返回
+	if len(updates) == 0 {
+		return &rel, nil
+	}
+
+	// 4. 更新关系
+	if err := s.db.WithContext(ctx).Model(&rel).Updates(updates).Error; err != nil {
+		return nil, fmt.Errorf("更新关系失败: %w", err)
+	}
+
+	// 5. 重新查询返回更新后的关系
+	if err := s.db.WithContext(ctx).First(&rel, rel.ID).Error; err != nil {
+		return nil, fmt.Errorf("获取更新后的关系失败: %w", err)
+	}
+
+	return &rel, nil
+}
+
+// ==================== App Service Relationship 相关（RESTful 风格）====================
+
+// ListAppServiceRelationships 列出应用服务下的关系
+func (s *Service) ListAppServiceRelationships(ctx context.Context, appID, serviceID, subjectType, subjectID string) ([]models.Relationship, error) {
+	// 1. 验证应用和服务是否存在
+	var app models.Application
+	if err := s.db.WithContext(ctx).Where("app_id = ?", appID).First(&app).Error; err != nil {
+		return nil, fmt.Errorf("应用不存在: %w", err)
+	}
+
+	var service models.Service
+	if err := s.db.WithContext(ctx).Where("service_id = ?", serviceID).First(&service).Error; err != nil {
+		return nil, fmt.Errorf("服务不存在: %w", err)
+	}
+
+	// 2. 验证应用是否有权限访问该服务
+	var relation models.ApplicationServiceRelation
+	if err := s.db.WithContext(ctx).Where("app_id = ? AND service_id = ?", appID, serviceID).First(&relation).Error; err != nil {
+		return nil, fmt.Errorf("应用无权访问该服务")
+	}
+
+	// 3. 查询关系
+	var rels []models.Relationship
+	query := s.db.WithContext(ctx).Where("service_id = ?", serviceID)
+	if subjectType != "" {
+		query = query.Where("subject_type = ?", subjectType)
+	}
+	if subjectID != "" {
+		query = query.Where("subject_id = ?", subjectID)
+	}
+	if err := query.Find(&rels).Error; err != nil {
+		return nil, fmt.Errorf("列出关系失败: %w", err)
+	}
+	return rels, nil
+}
+
+// CreateAppServiceRelationship 在应用服务下创建关系
+func (s *Service) CreateAppServiceRelationship(ctx context.Context, appID, serviceID string, req *AppServiceRelationshipCreateRequest) (*models.Relationship, error) {
+	// 1. 验证应用和服务是否存在
+	var app models.Application
+	if err := s.db.WithContext(ctx).Where("app_id = ?", appID).First(&app).Error; err != nil {
+		return nil, fmt.Errorf("应用不存在: %w", err)
+	}
+
+	var service models.Service
+	if err := s.db.WithContext(ctx).Where("service_id = ?", serviceID).First(&service).Error; err != nil {
+		return nil, fmt.Errorf("服务不存在: %w", err)
+	}
+
+	// 2. 验证应用是否有权限访问该服务
+	var relation models.ApplicationServiceRelation
+	if err := s.db.WithContext(ctx).Where("app_id = ? AND service_id = ?", appID, serviceID).First(&relation).Error; err != nil {
+		return nil, fmt.Errorf("应用无权访问该服务")
+	}
+
+	// 3. 解析过期时间
+	var expiresAt *time.Time
+	if req.ExpiresAt != nil {
+		exp, err := time.Parse(time.RFC3339, *req.ExpiresAt)
+		if err != nil {
+			return nil, fmt.Errorf("解析过期时间失败: %w", err)
+		}
+		expiresAt = &exp
+	}
+
+	// 4. 创建关系
+	rel := &models.Relationship{
+		ServiceID:   serviceID,
+		SubjectType: req.SubjectType,
+		SubjectID:   req.SubjectID,
+		Relation:    req.Relation,
+		ObjectType:  req.ObjectType,
+		ObjectID:    req.ObjectID,
+		ExpiresAt:   expiresAt,
+	}
+
+	if err := s.db.WithContext(ctx).Create(rel).Error; err != nil {
+		return nil, fmt.Errorf("创建关系失败: %w", err)
+	}
+
+	return rel, nil
+}
+
+// UpdateAppServiceRelationship 在应用服务下更新关系
+func (s *Service) UpdateAppServiceRelationship(ctx context.Context, appID, serviceID string, relationshipID uint, req *AppServiceRelationshipUpdateRequest) (*models.Relationship, error) {
+	// 1. 验证应用和服务是否存在
+	var app models.Application
+	if err := s.db.WithContext(ctx).Where("app_id = ?", appID).First(&app).Error; err != nil {
+		return nil, fmt.Errorf("应用不存在: %w", err)
+	}
+
+	var service models.Service
+	if err := s.db.WithContext(ctx).Where("service_id = ?", serviceID).First(&service).Error; err != nil {
+		return nil, fmt.Errorf("服务不存在: %w", err)
+	}
+
+	// 2. 验证应用是否有权限访问该服务
+	var relation models.ApplicationServiceRelation
+	if err := s.db.WithContext(ctx).Where("app_id = ? AND service_id = ?", appID, serviceID).First(&relation).Error; err != nil {
+		return nil, fmt.Errorf("应用无权访问该服务")
+	}
+
+	// 3. 查找关系（通过 ID 和 service_id）
+	var rel models.Relationship
+	if err := s.db.WithContext(ctx).Where("_id = ? AND service_id = ?", relationshipID, serviceID).First(&rel).Error; err != nil {
+		return nil, fmt.Errorf("关系不存在: %w", err)
+	}
+
+	// 4. 构建更新字段
+	updates := make(map[string]interface{})
+
+	// 更新关系类型（如果提供）
+	if req.NewRelation != nil && *req.NewRelation != "" {
+		updates["relation"] = *req.NewRelation
+	}
+
+	// 更新过期时间（如果提供）
+	if req.ExpiresAt != nil {
+		if *req.ExpiresAt == "" {
+			// 传空字符串表示清除过期时间
+			updates["expires_at"] = nil
+		} else {
+			// 解析 ISO 8601 格式的过期时间
+			exp, err := time.Parse(time.RFC3339, *req.ExpiresAt)
+			if err != nil {
+				return nil, fmt.Errorf("解析过期时间失败: %w", err)
+			}
+			updates["expires_at"] = exp
+		}
+	}
+
+	// 5. 如果没有要更新的字段，直接返回
+	if len(updates) == 0 {
+		return &rel, nil
+	}
+
+	// 6. 更新关系
+	if err := s.db.WithContext(ctx).Model(&rel).Updates(updates).Error; err != nil {
+		return nil, fmt.Errorf("更新关系失败: %w", err)
+	}
+
+	// 7. 重新查询返回更新后的关系
+	if err := s.db.WithContext(ctx).First(&rel, rel.ID).Error; err != nil {
+		return nil, fmt.Errorf("获取更新后的关系失败: %w", err)
+	}
+
+	return &rel, nil
+}
+
+// DeleteAppServiceRelationship 在应用服务下删除关系
+func (s *Service) DeleteAppServiceRelationship(ctx context.Context, appID, serviceID string, relationshipID uint) error {
+	// 1. 验证应用和服务是否存在
+	var app models.Application
+	if err := s.db.WithContext(ctx).Where("app_id = ?", appID).First(&app).Error; err != nil {
+		return fmt.Errorf("应用不存在: %w", err)
+	}
+
+	var service models.Service
+	if err := s.db.WithContext(ctx).Where("service_id = ?", serviceID).First(&service).Error; err != nil {
+		return fmt.Errorf("服务不存在: %w", err)
+	}
+
+	// 2. 验证应用是否有权限访问该服务
+	var relation models.ApplicationServiceRelation
+	if err := s.db.WithContext(ctx).Where("app_id = ? AND service_id = ?", appID, serviceID).First(&relation).Error; err != nil {
+		return fmt.Errorf("应用无权访问该服务")
+	}
+
+	// 3. 删除关系（通过 ID 和 service_id）
+	if err := s.db.WithContext(ctx).Where("_id = ? AND service_id = ?", relationshipID, serviceID).Delete(&models.Relationship{}).Error; err != nil {
+		return fmt.Errorf("删除关系失败: %w", err)
+	}
+
+	return nil
+}
+
 // ==================== Group 相关 ====================
 
 // CreateGroup 创建组
