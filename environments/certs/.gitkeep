@@ -1,0 +1,9 @@
+# 证书文件目录
+# 使用 mkcert 生成本地证书：
+# cd environments/certs
+# mkcert -install
+# mkcert auth.heliannuuthus.com hermes.heliannuuthus.com zwei.heliannuuthus.com atlas.heliannuuthus.com
+# 
+# 生成的文件：
+# - fullchain.pem (证书链)
+# - privkey.pem (私钥)

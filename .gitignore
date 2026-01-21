@@ -47,3 +47,9 @@ build/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# SSL Certificates (local development only)
+environments/certs/*.pem
+environments/certs/*.key
+environments/certs/*.crt
+!environments/certs/.gitkeep

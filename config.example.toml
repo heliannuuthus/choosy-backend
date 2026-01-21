@@ -39,6 +39,18 @@ user = "zwei"           # 如果未指定，使用 database.user
 password = ""           # 如果未指定，使用 database.password
 name = "auth"           # 数据库名称
 
+# Redis 配置（用于存储 session、authorization_code、refresh_token）
+[redis]
+host = "localhost"      # Redis 主机地址
+port = 6379             # Redis 端口
+password = ""           # Redis 密码（如果未设置密码则留空）
+db = 0                  # Redis 数据库编号（0-15）
+# 前缀配置（可选）
+# session-prefix = "auth:session:"
+# code-prefix = "auth:code:"
+# refresh-token-prefix = "auth:rt:"
+# user-token-prefix = "auth:user:rt:"
+
 [cors]
 origins = ["*"]
 allow_credentials = true

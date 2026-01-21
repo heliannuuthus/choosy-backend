@@ -1,0 +1,13 @@
+# 生产环境覆盖配置
+# 生产环境：gateway 正常暴露 80 端口，不使用 https-proxy
+# SSL 终止在 Cloudflare，gateway 只需处理 HTTP
+# 注意：生产环境启动时使用 --scale https-proxy=0 禁用 https-proxy 服务
+
+services:
+  gateway:
+    # 生产环境：gateway 映射主机端口 80
+    # Cloudflare 处理 SSL 终止，转发 HTTP 到 gateway:80
+    ports:
+      - "80:80"
+    expose:
+      - "80"

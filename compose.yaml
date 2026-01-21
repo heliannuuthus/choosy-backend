@@ -1,0 +1,122 @@
+name: helios-middleware
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: helios-db
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_USER: ${MYSQL_USER:-helios}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-helios}
+    volumes:
+      - helios_mysql_data:/var/lib/mysql
+      - helios_mysql_logs:/var/log/mysql
+      # 挂载 SQL 初始化文件
+      - ./sql/auth/schema.sql:/docker-entrypoint-initdb.d/01-auth-schema.sql:ro
+      - ./sql/auth/init.sql:/docker-entrypoint-initdb.d/02-auth-init.sql:ro
+      - ./sql/zwei/schema.sql:/docker-entrypoint-initdb.d/03-zwei-schema.sql:ro
+      - ./sql/zwei/init.sql:/docker-entrypoint-initdb.d/04-zwei-init.sql:ro
+      # 挂载 MySQL 配置
+      - ./environments/db/my.cnf:/etc/mysql/conf.d/custom.cnf:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 450m
+          cpus: "1.5"
+    healthcheck:
+      test: "CMD-SHELL mysqladmin ping -h localhost -uroot -proot || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  cache:
+    image: redis:7-alpine
+    container_name: helios-cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - helios_redis_data:/data
+      # 挂载 Redis 配置
+      - ./environments/cache/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
+    healthcheck:
+      test: "CMD redis-cli ping"
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  gateway:
+    image: nginx:alpine
+    container_name: helios-gateway
+    # 本地开发默认 HTTPS 模式：gateway 不映射主机端口 80，只暴露给容器内部
+    # https-proxy 会监听主机端口 80 和 443，转发到 gateway:80
+    # 生产环境：通过 compose.prod.yaml 覆盖，正常映射主机端口 80，不使用 https-proxy
+    ports: []
+    expose:
+      - "80"
+    volumes:
+      # 挂载 Nginx 配置
+      - ./environments/gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
+    # nerdctl compose 不完全支持 depends_on condition，使用简单依赖
+    # 实际启动顺序通过 restart 策略和健康检查脚本控制
+    depends_on:
+      - db
+      - cache
+    healthcheck:
+      # 检查 nginx 是否真正在运行（检查端口 80 是否监听）
+      test: "CMD-SHELL wget --quiet --tries=1 --spider http://localhost:80 || exit 1"
+      interval: 5s
+      timeout: 2s
+      retries: 3
+      start_period: 5s
+    stop_grace_period: 10s
+
+  https-proxy:
+    # 本地开发 HTTPS 模式：监听主机端口 80 和 443，转发到 gateway:80
+    image: nginx:alpine
+    container_name: helios-https-proxy
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./environments/https-proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./environments/certs:/etc/nginx/ssl:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+          cpus: "0.1"
+    # nerdctl compose 不完全支持 depends_on condition，使用简单依赖
+    depends_on:
+      - gateway
+    healthcheck:
+      # 检查 nginx 是否真正在运行（检查端口 80 是否监听）
+      test: "CMD-SHELL wget --quiet --tries=1 --spider http://localhost:80 || exit 1"
+      interval: 5s
+      timeout: 2s
+      retries: 3
+      start_period: 5s
+    stop_grace_period: 10s
+
+volumes:
+  helios_redis_data:
+  helios_mysql_data:
+  helios_mysql_logs:
