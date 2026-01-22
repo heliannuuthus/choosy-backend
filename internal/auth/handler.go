@@ -18,27 +18,42 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
-// Authorize GET /auth/authorize
+// Authorize POST /auth/authorize
 // @Summary 创建认证会话并重定向到登录页面
-// @Description OAuth2.1/OIDC 授权端点，创建认证会话，设置 auth-session Cookie，然后重定向到登录页面
-// Session ID 通过 HttpOnly Cookie（auth-session）传递，后续 login 请求会从 Cookie 读取。
-// 如果 SPA 和 API 不在同一域名，需要配置 CORS allow_credentials=true。
+// @Description OAuth2.1/OIDC 授权端点
+// @Description - POST + Form：单服务模式
+// @Description - POST + JSON：多服务模式（支持 multi_audiences）
 // @Tags auth
-// @Param response_type query string true "响应类型，必须为 code" Enums(code)
-// @Param client_id query string true "客户端 ID"
-// @Param redirect_uri query string true "重定向 URI"
-// @Param code_challenge query string true "PKCE Code Challenge"
-// @Param code_challenge_method query string true "PKCE 方法，必须为 S256" Enums(S256)
-// @Param state query string false "状态参数"
-// @Param scope query string false "授权范围"
+// @Accept x-www-form-urlencoded
+// @Accept json
+// @Param response_type formData string true "响应类型，必须为 code" Enums(code)
+// @Param client_id formData string true "客户端 ID"
+// @Param redirect_uri formData string true "重定向 URI"
+// @Param code_challenge formData string true "PKCE Code Challenge"
+// @Param code_challenge_method formData string true "PKCE 方法，必须为 S256" Enums(S256)
+// @Param state formData string false "状态参数"
+// @Param scope formData string false "授权范围"
+// @Param request body AuthorizeRequest false "授权请求（POST JSON 格式，支持 multi_audiences）"
 // @Success 302 "重定向到登录页面"
 // @Failure 400 {object} Error
-// @Router /auth/authorize [get]
+// @Router /auth/authorize [post]
 func (h *Handler) Authorize(c *gin.Context) {
 	var req AuthorizeRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		h.errorResponse(c, http.StatusBadRequest, NewError(ErrInvalidRequest, err.Error()))
-		return
+
+	// 根据 Content-Type 判断单服务/多服务
+	contentType := c.GetHeader("Content-Type")
+	if strings.Contains(contentType, "application/json") {
+		// POST + JSON：多服务模式
+		if err := c.ShouldBindJSON(&req); err != nil {
+			h.errorResponse(c, http.StatusBadRequest, NewError(ErrInvalidRequest, err.Error()))
+			return
+		}
+	} else {
+		// POST + Form：单服务模式
+		if err := c.ShouldBind(&req); err != nil {
+			h.errorResponse(c, http.StatusBadRequest, NewError(ErrInvalidRequest, err.Error()))
+			return
+		}
 	}
 
 	sessionID, err := h.service.Authorize(c.Request.Context(), &req)
@@ -51,15 +66,8 @@ func (h *Handler) Authorize(c *gin.Context) {
 		return
 	}
 
-	// 设置 session cookie（HttpOnly，必须通过 Cookie 传递）
-	// Cookie 名称使用 auth-session（带连字符，符合 HTTP Cookie 规范）
-	// HttpOnly 防止 JavaScript 访问，提高安全性
 	c.SetCookie("auth-session", sessionID, 600, "/", "", false, true)
-
-	// 重定向到登录页面（前端登录页面）
-	// 前端可以从 GET /idps?client_id=xxx 获取可用的认证源配置
-	loginURL := "/login"
-	c.Redirect(http.StatusFound, loginURL)
+	c.Redirect(http.StatusFound, "/login")
 }
 
 // Login POST /auth/login
@@ -139,26 +147,45 @@ func (h *Handler) Login(c *gin.Context) {
 // Token POST /auth/token
 // @Summary 获取 Token
 // @Description OAuth2 Token 端点
+// @Description - 单服务（Form 请求）：返回 TokenResponse
+// @Description - 多服务（JSON 请求）：返回 map[string]TokenResponse
 // @Tags auth
 // @Accept x-www-form-urlencoded
+// @Accept json
 // @Produce json
-// @Param grant_type formData string true "授权类型" Enums(authorization_code,refresh_token)
+// @Param Authorization header string false "Bearer <Client JWT>（client_credentials 时必填）"
+// @Param grant_type formData string true "授权类型" Enums(authorization_code,refresh_token,client_credentials)
 // @Param code formData string false "授权码"
 // @Param redirect_uri formData string false "重定向 URI"
-// @Param client_id formData string true "客户端 ID"
+// @Param client_id formData string false "客户端 ID（authorization_code/refresh_token 时必填）"
 // @Param code_verifier formData string false "PKCE 验证器"
 // @Param refresh_token formData string false "Refresh Token"
-// @Success 200 {object} TokenResponse
+// @Success 200 {object} TokenResponse "单服务响应"
+// @Success 200 {object} MultiTokenResponse "多服务响应"
 // @Failure 400 {object} Error
+// @Failure 401 {object} Error
 // @Router /auth/token [post]
 func (h *Handler) Token(c *gin.Context) {
 	var req TokenRequest
-	if err := c.ShouldBind(&req); err != nil {
-		h.errorResponse(c, http.StatusBadRequest, NewError(ErrInvalidRequest, err.Error()))
-		return
+
+	// 根据 Content-Type 判断单服务/多服务
+	contentType := c.GetHeader("Content-Type")
+	if strings.Contains(contentType, "application/json") {
+		// JSON 格式：多服务模式
+		if err := c.ShouldBindJSON(&req); err != nil {
+			h.errorResponse(c, http.StatusBadRequest, NewError(ErrInvalidRequest, err.Error()))
+			return
+		}
+	} else {
+		// Form 格式：单服务模式
+		if err := c.ShouldBind(&req); err != nil {
+			h.errorResponse(c, http.StatusBadRequest, NewError(ErrInvalidRequest, err.Error()))
+			return
+		}
 	}
 
-	resp, err := h.service.ExchangeToken(c.Request.Context(), &req)
+	// 统一处理所有 grant_type
+	resp, err := h.service.ExchangeToken(c.Request.Context(), c, &req)
 	if err != nil {
 		if authErr, ok := err.(*Error); ok {
 			h.errorResponse(c, http.StatusBadRequest, authErr)

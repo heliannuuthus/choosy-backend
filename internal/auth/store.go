@@ -23,6 +23,7 @@ type Store interface {
 	GetAuthCode(ctx context.Context, code string) (*AuthorizationCode, error)
 	MarkAuthCodeUsed(ctx context.Context, code string) error
 	DeleteAuthCode(ctx context.Context, code string) error
+	GetSessionByAuthCode(ctx context.Context, code string) (*Session, error) // 通过授权码获取关联的 Session
 
 	// RefreshToken 管理
 	SaveRefreshToken(ctx context.Context, token *RefreshToken) error
@@ -161,6 +162,23 @@ func (s *MemoryStore) DeleteAuthCode(ctx context.Context, code string) error {
 	defer s.mu.Unlock()
 	delete(s.codes, code)
 	return nil
+}
+
+func (s *MemoryStore) GetSessionByAuthCode(ctx context.Context, code string) (*Session, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	authCode, ok := s.codes[code]
+	if !ok {
+		return nil, ErrCodeNotFound
+	}
+	if authCode.SessionID == "" {
+		return nil, ErrSessionNotFound
+	}
+	session, ok := s.sessions[authCode.SessionID]
+	if !ok {
+		return nil, ErrSessionNotFound
+	}
+	return session, nil
 }
 
 func (s *MemoryStore) SaveRefreshToken(ctx context.Context, token *RefreshToken) error {
@@ -396,6 +414,17 @@ func (s *RedisStore) MarkAuthCodeUsed(ctx context.Context, code string) error {
 
 func (s *RedisStore) DeleteAuthCode(ctx context.Context, code string) error {
 	return s.client.Del(ctx, s.codePrefix+code)
+}
+
+func (s *RedisStore) GetSessionByAuthCode(ctx context.Context, code string) (*Session, error) {
+	authCode, err := s.GetAuthCode(ctx, code)
+	if err != nil {
+		return nil, err
+	}
+	if authCode.SessionID == "" {
+		return nil, ErrSessionNotFound
+	}
+	return s.GetSession(ctx, authCode.SessionID)
 }
 
 func (s *RedisStore) SaveRefreshToken(ctx context.Context, token *RefreshToken) error {
