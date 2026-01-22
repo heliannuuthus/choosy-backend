@@ -60,6 +60,13 @@ func (c *Client) ValidateIDP(idp IDP) bool {
 	return idp.GetDomain() == c.Domain
 }
 
+// SupportsGrantType 检查客户端是否支持指定的 grant type
+func (c *Client) SupportsGrantType(grantType GrantType) bool {
+	// TODO: 从数据库读取 GrantTypes 字段
+	// 目前默认只支持 authorization_code
+	return grantType == GrantTypeAuthorizationCode
+}
+
 // GenerateClientID 生成客户端 ID
 func GenerateClientID() string {
 	bytes := make([]byte, 16)

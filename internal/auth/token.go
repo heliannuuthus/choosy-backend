@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -8,203 +9,258 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/heliannuuthus/helios/internal/config"
+	"github.com/heliannuuthus/helios/internal/hermes/models"
+	"github.com/heliannuuthus/helios/pkg/auth/secret"
+	tokenpkg "github.com/heliannuuthus/helios/pkg/auth/token"
+	"github.com/heliannuuthus/helios/pkg/kms"
 	"github.com/lestrrat-go/jwx/v3/jwa"
-	"github.com/lestrrat-go/jwx/v3/jwe"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jwt"
+	"gorm.io/gorm"
 )
 
-// TokenManager Token 管理器
+// Key ID 前缀常量
+const (
+	keyPrefixDomain  = "domain"
+	keyPrefixClient  = "client"
+	keyPrefixService = "service"
+)
+
+// 构建 key ID 的辅助函数
+func domainKeyID(domainID string) string   { return keyPrefixDomain + ":" + domainID }
+func clientKeyID(clientID string) string   { return keyPrefixClient + ":" + clientID }
+func serviceKeyID(serviceID string) string { return keyPrefixService + ":" + serviceID }
+
+// parseKeyID 解析 key ID，返回前缀和标识符
+func parseKeyID(id string) (prefix, identifier string, err error) {
+	parts := strings.SplitN(id, ":", 2)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid key ID format: %s", id)
+	}
+	return parts[0], parts[1], nil
+}
+
+// newSecretEntry 创建 SecretEntry
+func newSecretEntry(id string, value []byte) []*secret.SecretEntry {
+	return []*secret.SecretEntry{{ID: id, Value: value, CreatedAt: time.Now()}}
+}
+
+// secretLoader 动态加载密钥的 Loader
+type secretLoader struct {
+	db *gorm.DB
+}
+
+func (l *secretLoader) Load(ctx context.Context, id string) ([]*secret.SecretEntry, error) {
+	prefix, identifier, err := parseKeyID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	switch prefix {
+	case keyPrefixDomain:
+		keyBytes, err := config.GetDomainSignKey(identifier)
+		if err != nil {
+			return nil, fmt.Errorf("load domain sign key: %w", err)
+		}
+		return newSecretEntry(id, keyBytes), nil
+
+	case keyPrefixClient:
+		var client Client
+		if err := l.db.WithContext(ctx).Where("client_id = ?", identifier).First(&client).Error; err != nil {
+			return nil, fmt.Errorf("client not found: %w", err)
+		}
+		keyBytes, err := config.GetDomainEncryptKey(string(client.Domain))
+		if err != nil {
+			return nil, fmt.Errorf("load domain encrypt key: %w", err)
+		}
+		return newSecretEntry(id, keyBytes), nil
+
+	case keyPrefixService:
+		var service models.Service
+		if err := l.db.WithContext(ctx).Where("service_id = ?", identifier).First(&service).Error; err != nil {
+			return nil, fmt.Errorf("service not found: %w", err)
+		}
+		serviceKey, err := l.decryptServiceKey(&service)
+		if err != nil {
+			return nil, err
+		}
+		return newSecretEntry(id, serviceKey), nil
+
+	default:
+		return nil, fmt.Errorf("unknown key prefix: %s", prefix)
+	}
+}
+
+// decryptServiceKey 解密服务密钥
+func (l *secretLoader) decryptServiceKey(service *models.Service) ([]byte, error) {
+	domainEncryptKey, err := config.GetDomainEncryptKey(service.DomainID)
+	if err != nil {
+		return nil, fmt.Errorf("get domain encrypt key: %w", err)
+	}
+
+	encryptedKeyBytes, err := base64.StdEncoding.DecodeString(service.EncryptedKey)
+	if err != nil {
+		return nil, fmt.Errorf("decode encrypted key: %w", err)
+	}
+
+	return kms.DecryptAESGCM(domainEncryptKey, encryptedKeyBytes, service.ServiceID)
+}
+
+// TokenManager Token 管理器（嵌入 tokenpkg.Manager）
 type TokenManager struct {
-	issuer     string
-	signingKey jwk.Key
-	encryptKey jwk.Key
+	*tokenpkg.Manager
+	issuer string
+	db     *gorm.DB
 }
 
 // NewTokenManager 创建 Token 管理器
-func NewTokenManager() (*TokenManager, error) {
-	tm := &TokenManager{
-		issuer: config.GetString("auth.issuer"),
-	}
+func NewTokenManager(db *gorm.DB) (*TokenManager, error) {
+	return &TokenManager{
+		Manager: tokenpkg.NewManager(&secretLoader{db: db}),
+		issuer:  config.GetIssuer(),
+		db:      db,
+	}, nil
+}
 
-	// 加载签名密钥
-	signKeyB64 := config.GetString("kms.token.sign-key")
-	if signKeyB64 != "" {
-		keyBytes, err := base64.RawURLEncoding.DecodeString(signKeyB64)
-		if err != nil {
-			return nil, fmt.Errorf("decode signing key: %w", err)
-		}
-		key, err := jwk.ParseKey(keyBytes)
-		if err != nil {
-			return nil, fmt.Errorf("parse signing key: %w", err)
-		}
-		tm.signingKey = key
+// getClient 查询客户端
+func (tm *TokenManager) getClient(ctx context.Context, clientID string) (*Client, error) {
+	var client Client
+	if err := tm.db.WithContext(ctx).Where("client_id = ?", clientID).First(&client).Error; err != nil {
+		return nil, fmt.Errorf("client not found: %w", err)
 	}
-
-	// 加载加密密钥
-	encKeyB64 := config.GetString("kms.token.enc-key")
-	if encKeyB64 != "" {
-		keyBytes, err := base64.RawURLEncoding.DecodeString(encKeyB64)
-		if err != nil {
-			return nil, fmt.Errorf("decode encrypt key: %w", err)
-		}
-		key, err := jwk.ParseKey(keyBytes)
-		if err != nil {
-			return nil, fmt.Errorf("parse encrypt key: %w", err)
-		}
-		tm.encryptKey = key
-	}
-
-	return tm, nil
+	return &client, nil
 }
 
 // CreateAccessToken 创建 Access Token
 // sub 字段包含加密的用户信息（openid, nickname, picture, email, phone）
-func (tm *TokenManager) CreateAccessToken(claims *SubjectClaims, clientID string, scope string, ttl time.Duration) (string, error) {
-	now := time.Now()
+func (tm *TokenManager) CreateAccessToken(claims *SubjectClaims, client *Client, scope string, ttl time.Duration) (string, error) {
+	ctx := context.Background()
 
-	// 加密 sub（用户信息）
-	encryptedSub, err := tm.encryptSubjectClaims(claims)
+	encryptedSub, err := tm.encryptSubjectClaims(ctx, claims, clientKeyID(client.ClientID))
 	if err != nil {
 		return "", fmt.Errorf("encrypt sub: %w", err)
 	}
 
-	// 创建 JWT
-	token := jwt.New()
-	_ = token.Set(jwt.IssuerKey, tm.issuer)
-	_ = token.Set(jwt.SubjectKey, encryptedSub)
-	_ = token.Set(jwt.AudienceKey, clientID)
-	_ = token.Set(jwt.IssuedAtKey, now.Unix())
-	_ = token.Set(jwt.ExpirationKey, now.Add(ttl).Unix())
-	_ = token.Set(jwt.NotBeforeKey, now.Unix())
-
-	// JTI
-	jtiBytes := make([]byte, 16)
-	_, _ = rand.Read(jtiBytes)
-	_ = token.Set(jwt.JwtIDKey, hex.EncodeToString(jtiBytes))
-
-	// scope
-	_ = token.Set("scope", scope)
-
-	// 签名
-	signedToken, err := jwt.Sign(token, jwt.WithKey(jwa.EdDSA(), tm.signingKey))
-	if err != nil {
-		return "", fmt.Errorf("sign token: %w", err)
-	}
-
-	return string(signedToken), nil
+	return tm.Signer(domainKeyID(string(client.Domain))).Sign(
+		ctx, tm.issuer, encryptedSub, client.ClientID, int(ttl.Seconds()), "scope", scope,
+	)
 }
 
-// VerifyAccessToken 验证 Access Token，返回完整身份信息
+// VerifyAccessToken 验证 Access Token，返回身份信息
 func (tm *TokenManager) VerifyAccessToken(tokenString string) (*Identity, error) {
-	// 验证签名
-	token, err := jwt.Parse([]byte(tokenString),
-		jwt.WithKey(jwa.EdDSA(), tm.signingKey),
-		jwt.WithValidate(true),
-	)
+	ctx := context.Background()
+
+	// 先解析 token 获取 clientID（不验证签名）
+	clientID, err := tm.extractClientID(tokenString)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := tm.getClient(ctx, clientID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 验证 JWT
+	verifiedToken, err := tm.Verifier(domainKeyID(string(client.Domain))).Verify(ctx, tokenString)
 	if err != nil {
 		return nil, fmt.Errorf("verify token: %w", err)
 	}
 
-	// 获取加密的 sub
-	encryptedSub, ok := token.Subject()
+	// 获取并解密 sub
+	encryptedSub, ok := verifiedToken.Subject()
 	if !ok {
 		return nil, errors.New("missing sub")
 	}
 
-	// 解密 sub
-	claims, err := tm.decryptSubjectClaims(encryptedSub)
+	claims, err := tm.decryptSubjectClaims(ctx, encryptedSub, clientKeyID(clientID))
 	if err != nil {
 		return nil, fmt.Errorf("decrypt sub: %w", err)
 	}
 
-	// 获取 scope
-	var scope string
-	_ = token.Get("scope", &scope)
+	// 构造 AccessToken 并设置用户信息
+	accessToken := tokenpkg.NewAccessToken(verifiedToken).
+		WithUserInfo(claims.OpenID, claims.Nickname, claims.Picture, claims.Email, claims.Phone)
 
 	return &Identity{
-		UserID:   claims.OpenID,
-		Scope:    scope,
-		Nickname: claims.Nickname,
-		Picture:  claims.Picture,
-		Email:    claims.Email,
-		Phone:    claims.Phone,
+		UserID:   accessToken.Subject,
+		Scope:    accessToken.Scope,
+		Nickname: accessToken.Nickname,
+		Picture:  accessToken.Picture,
+		Email:    accessToken.Email,
+		Phone:    accessToken.Phone,
 	}, nil
 }
 
+// extractClientID 从 token 中提取 clientID（不验证签名）
+func (tm *TokenManager) extractClientID(tokenString string) (string, error) {
+	token, err := jwt.Parse([]byte(tokenString), jwt.WithVerify(false))
+	if err != nil {
+		return "", fmt.Errorf("parse token: %w", err)
+	}
+
+	aud, ok := token.Audience()
+	if !ok || len(aud) == 0 {
+		return "", errors.New("missing audience (clientID)")
+	}
+	return aud[0], nil
+}
+
 // ParseAccessTokenUnverified 解析 Token 但不验证（用于获取 claims）
-func (tm *TokenManager) ParseAccessTokenUnverified(tokenString string) (aud string, iss string, exp int64, iat int64, scope string, err error) {
-	token, parseErr := jwt.Parse([]byte(tokenString), jwt.WithVerify(false))
-	if parseErr != nil {
-		err = parseErr
+func (tm *TokenManager) ParseAccessTokenUnverified(tokenString string) (aud, iss string, exp, iat int64, scope string, err error) {
+	token, err := jwt.Parse([]byte(tokenString), jwt.WithVerify(false))
+	if err != nil {
 		return
 	}
 
-	if audVal, ok := token.Audience(); ok && len(audVal) > 0 {
-		aud = audVal[0]
+	if v, ok := token.Audience(); ok && len(v) > 0 {
+		aud = v[0]
 	}
-	if issVal, ok := token.Issuer(); ok {
-		iss = issVal
+	iss, _ = token.Issuer()
+	if v, ok := token.Expiration(); ok {
+		exp = v.Unix()
 	}
-	if expVal, ok := token.Expiration(); ok {
-		exp = expVal.Unix()
-	}
-	if iatVal, ok := token.IssuedAt(); ok {
-		iat = iatVal.Unix()
+	if v, ok := token.IssuedAt(); ok {
+		iat = v.Unix()
 	}
 	_ = token.Get("scope", &scope)
 	return
 }
 
 // encryptSubjectClaims 加密用户信息
-func (tm *TokenManager) encryptSubjectClaims(claims *SubjectClaims) (string, error) {
-	if tm.encryptKey == nil {
-		// 没有加密密钥则返回 JSON
-		data, err := json.Marshal(claims)
-		if err != nil {
-			return "", err
-		}
-		return string(data), nil
-	}
-
+// encryptorID 格式：client:{clientID} 或 service:{serviceID}
+func (tm *TokenManager) encryptSubjectClaims(ctx context.Context, claims *SubjectClaims, encryptorID string) (string, error) {
 	data, err := json.Marshal(claims)
 	if err != nil {
 		return "", err
 	}
 
-	encrypted, err := jwe.Encrypt(data,
-		jwe.WithKey(jwa.DIRECT(), tm.encryptKey),
-		jwe.WithContentEncryption(jwa.A256GCM()),
-	)
+	// 尝试使用 Encryptor 加密，如果失败（未配置加密密钥）则返回 JSON
+	encrypted, err := tm.Encryptor(encryptorID).Encrypt(ctx, data, jwa.A256GCM())
 	if err != nil {
-		return "", err
+		// 如果加密失败（可能是未配置加密密钥），返回 JSON
+		return string(data), nil
 	}
 
 	return string(encrypted), nil
 }
 
 // decryptSubjectClaims 解密用户信息
-func (tm *TokenManager) decryptSubjectClaims(encryptedSub string) (*SubjectClaims, error) {
-	var data []byte
-
-	if tm.encryptKey == nil {
-		// 没有加密密钥则直接解析 JSON
-		data = []byte(encryptedSub)
-	} else {
-		decrypted, err := jwe.Decrypt([]byte(encryptedSub),
-			jwe.WithKey(jwa.DIRECT(), tm.encryptKey),
-		)
-		if err != nil {
-			return nil, err
-		}
-		data = decrypted
+// decryptorID 格式：client:{clientID} 或 service:{serviceID}
+func (tm *TokenManager) decryptSubjectClaims(ctx context.Context, encryptedSub string, decryptorID string) (*SubjectClaims, error) {
+	// 尝试使用 Decryptor 解密，如果失败（未配置解密密钥或数据未加密）则尝试直接解析 JSON
+	decrypted, err := tm.Decryptor(decryptorID).Decrypt(ctx, []byte(encryptedSub))
+	if err != nil {
+		// 如果解密失败，可能是未加密的 JSON，尝试直接解析
+		decrypted = []byte(encryptedSub)
 	}
 
 	var claims SubjectClaims
-	if err := json.Unmarshal(data, &claims); err != nil {
+	if err := json.Unmarshal(decrypted, &claims); err != nil {
 		return nil, err
 	}
 
@@ -237,18 +293,26 @@ func (tm *TokenManager) VerifyServiceJWT(tokenString string, serviceKey []byte) 
 	return sub, jtiVal, nil
 }
 
+// randomBytes 生成随机字节
+func randomBytes(n int) []byte {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return b
+}
+
 // GenerateAuthorizationCode 生成授权码
 func GenerateAuthorizationCode() string {
-	bytes := make([]byte, 32)
-	_, _ = rand.Read(bytes)
-	return base64.RawURLEncoding.EncodeToString(bytes)
+	return base64.RawURLEncoding.EncodeToString(randomBytes(32))
 }
 
 // GenerateSessionID 生成会话 ID
 func GenerateSessionID() string {
-	bytes := make([]byte, 16)
-	_, _ = rand.Read(bytes)
-	return base64.RawURLEncoding.EncodeToString(bytes)
+	return base64.RawURLEncoding.EncodeToString(randomBytes(16))
+}
+
+// GenerateRefreshToken 生成 Refresh Token
+func GenerateRefreshToken() string {
+	return hex.EncodeToString(randomBytes(32))
 }
 
 // VerifyCodeChallenge 验证 PKCE（只支持 S256）
@@ -257,15 +321,40 @@ func VerifyCodeChallenge(method CodeChallengeMethod, challenge, verifier string)
 		return false
 	}
 	hash := sha256.Sum256([]byte(verifier))
-	computed := base64.RawURLEncoding.EncodeToString(hash[:])
-	return computed == challenge
+	return base64.RawURLEncoding.EncodeToString(hash[:]) == challenge
 }
 
-// VerifyAccessToken 兼容旧接口（全局函数）
-func VerifyAccessToken(tokenString string) (*Identity, error) {
-	tm, err := NewTokenManager()
-	if err != nil {
-		return nil, err
+// CreateServiceJWT 创建服务 JWT
+// userID 非空时为用户令牌，空字符串时为服务令牌
+func (tm *TokenManager) CreateServiceJWT(serviceID, userID, scope string, serviceKey []byte, ttl time.Duration) (string, error) {
+	now := time.Now()
+
+	token := jwt.New()
+	_ = token.Set(jwt.IssuerKey, tm.issuer)
+	_ = token.Set(jwt.AudienceKey, serviceID)
+	_ = token.Set(jwt.IssuedAtKey, now.Unix())
+	_ = token.Set(jwt.ExpirationKey, now.Add(ttl).Unix())
+	_ = token.Set(jwt.NotBeforeKey, now.Unix())
+	_ = token.Set(jwt.JwtIDKey, hex.EncodeToString(randomBytes(16)))
+	_ = token.Set("scope", scope)
+
+	if userID != "" {
+		_ = token.Set(jwt.SubjectKey, userID)
 	}
-	return tm.VerifyAccessToken(tokenString)
+
+	key, err := jwk.Import(serviceKey)
+	if err != nil {
+		return "", fmt.Errorf("import service key: %w", err)
+	}
+
+	signedToken, err := jwt.Sign(token, jwt.WithKey(jwa.HS256(), key))
+	if err != nil {
+		return "", fmt.Errorf("sign token: %w", err)
+	}
+	return string(signedToken), nil
+}
+
+// CreateRefreshToken 创建 Refresh Token（简化版，返回 token 字符串）
+func (tm *TokenManager) CreateRefreshToken(_, _, _ string, _ time.Duration) (string, error) {
+	return GenerateRefreshToken(), nil
 }

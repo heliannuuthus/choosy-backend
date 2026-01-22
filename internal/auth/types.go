@@ -55,6 +55,7 @@ type GrantType string
 const (
 	GrantTypeAuthorizationCode GrantType = "authorization_code"
 	GrantTypeRefreshToken      GrantType = "refresh_token"
+	GrantTypeClientCredentials GrantType = "client_credentials"
 )
 
 // CodeChallengeMethod PKCE 验证方法（OAuth2.1 只允许 S256）
@@ -75,15 +76,21 @@ const (
 
 // ============= Request/Response =============
 
-// AuthorizeRequest 授权请求（GET 参数）
+// AuthorizeRequest 授权请求（支持 POST Form 和 POST JSON）
 type AuthorizeRequest struct {
-	ResponseType        string              `form:"response_type" binding:"required,oneof=code"` // 只允许 code
-	ClientID            string              `form:"client_id" binding:"required"`
-	RedirectURI         string              `form:"redirect_uri" binding:"required"`
-	CodeChallenge       string              `form:"code_challenge" binding:"required"`
-	CodeChallengeMethod CodeChallengeMethod `form:"code_challenge_method" binding:"required,oneof=S256"` // 只允许 S256
-	State               string              `form:"state"`
-	Scope               string              `form:"scope"` // 空格分隔的 scope 列表
+	ResponseType        string                     `form:"response_type" json:"response_type" binding:"required,oneof=code"`
+	ClientID            string                     `form:"client_id" json:"client_id" binding:"required"`
+	RedirectURI         string                     `form:"redirect_uri" json:"redirect_uri" binding:"required"`
+	CodeChallenge       string                     `form:"code_challenge" json:"code_challenge" binding:"required"`
+	CodeChallengeMethod CodeChallengeMethod        `form:"code_challenge_method" json:"code_challenge_method" binding:"required,oneof=S256"`
+	State               string                     `form:"state" json:"state"`
+	Scope               string                     `form:"scope" json:"scope"`
+	MultiAudiences      map[string]AudienceRequest `json:"multi_audiences,omitempty"` // 多服务凭证请求（JSON 格式）
+}
+
+// AudienceRequest 服务凭证请求
+type AudienceRequest struct {
+	Scope []string `json:"scope"` // 该服务的 scope 列表
 }
 
 // ParseScopes 解析 scope 字符串为列表
@@ -137,22 +144,26 @@ type InteractionRequiredResponse struct {
 
 // TokenRequest Token 请求
 type TokenRequest struct {
-	GrantType    GrantType `form:"grant_type" binding:"required,oneof=authorization_code refresh_token"`
-	Code         string    `form:"code"`          // authorization_code 时必填
-	RedirectURI  string    `form:"redirect_uri"`  // authorization_code 时必填
-	ClientID     string    `form:"client_id"`     // 必填
-	CodeVerifier string    `form:"code_verifier"` // PKCE 验证器
-	RefreshToken string    `form:"refresh_token"` // refresh_token grant 时必填
+	GrantType      GrantType                  `form:"grant_type" json:"grant_type" binding:"required,oneof=authorization_code refresh_token client_credentials"`
+	Code           string                     `form:"code" json:"code"`
+	RedirectURI    string                     `form:"redirect_uri" json:"redirect_uri"`
+	ClientID       string                     `form:"client_id" json:"client_id"`
+	CodeVerifier   string                     `form:"code_verifier" json:"code_verifier"`
+	RefreshToken   string                     `form:"refresh_token" json:"refresh_token"`
+	MultiAudiences map[string]AudienceRequest `json:"multi_audiences,omitempty"` // client_credentials 专用：多服务凭证请求
 }
 
-// TokenResponse Token 响应
+// TokenResponse Token 响应（单服务和多服务共用）
 type TokenResponse struct {
-	AccessToken  string `json:"access_token"`
+	AccessToken  string `json:"access_token"`            // JWT 令牌
 	RefreshToken string `json:"refresh_token,omitempty"` // 只有 offline_access 时返回
-	TokenType    string `json:"token_type"`
-	ExpiresIn    int    `json:"expires_in"`
-	Scope        string `json:"scope"` // 实际授予的 scope
+	TokenType    string `json:"token_type"`              // "Bearer"
+	ExpiresIn    int    `json:"expires_in"`              // 过期时间（秒）
+	Scope        string `json:"scope"`                   // scope
 }
+
+// MultiTokenResponse 多服务凭证响应
+type MultiTokenResponse map[string]TokenResponse
 
 // IntrospectRequest Token 内省请求
 type IntrospectRequest struct {
@@ -241,6 +252,7 @@ type Session struct {
 	State               string              `json:"state"`
 	Scope               string              `json:"scope"`
 	Connection          string              `json:"connection,omitempty"` // 用户选择的 connection
+	MultiAudiences      string              `json:"multi_audiences,omitempty"` // JSON 序列化的 multi_audiences
 	CreatedAt           time.Time           `json:"created_at"`
 	ExpiresAt           time.Time           `json:"expires_at"`
 
@@ -259,6 +271,7 @@ type AuthorizationCode struct {
 	CodeChallengeMethod string    `json:"code_challenge_method"`
 	Scope               string    `json:"scope"` // 实际授予的 scope
 	UserID              string    `json:"user_id"`
+	SessionID           string    `json:"session_id"` // 关联的 Session ID（用于读取 multi_audiences）
 	CreatedAt           time.Time `json:"created_at"`
 	ExpiresAt           time.Time `json:"expires_at"`
 	Used                bool      `json:"used"`

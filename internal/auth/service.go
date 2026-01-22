@@ -4,16 +4,19 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/heliannuuthus/helios/internal/config"
 	"github.com/heliannuuthus/helios/internal/hermes/models"
 	"github.com/heliannuuthus/helios/pkg/kms"
 	"github.com/heliannuuthus/helios/pkg/logger"
+	"github.com/gin-gonic/gin"
 	"github.com/lestrrat-go/jwx/v3/jwt"
 	"gorm.io/gorm"
 )
@@ -28,7 +31,7 @@ type Service struct {
 
 // NewService 创建认证服务
 func NewService(db *gorm.DB) (*Service, error) {
-	tokenManager, err := NewTokenManager()
+	tokenManager, err := NewTokenManager(db)
 	if err != nil {
 		return nil, fmt.Errorf("create token manager: %w", err)
 	}
@@ -61,7 +64,17 @@ func (s *Service) Authorize(ctx context.Context, req *AuthorizeRequest) (string,
 		return "", NewError(ErrInvalidRequest, "invalid redirect_uri")
 	}
 
-	// 4. 创建会话
+	// 4. 序列化 multi_audiences
+	var multiAudiencesJSON string
+	if len(req.MultiAudiences) > 0 {
+		data, err := json.Marshal(req.MultiAudiences)
+		if err != nil {
+			return "", NewError(ErrInvalidRequest, fmt.Sprintf("invalid multi_audiences: %v", err))
+		}
+		multiAudiencesJSON = string(data)
+	}
+
+	// 5. 创建会话
 	sessionID := GenerateSessionID()
 	session := &Session{
 		ID:                  sessionID,
@@ -71,6 +84,7 @@ func (s *Service) Authorize(ctx context.Context, req *AuthorizeRequest) (string,
 		CodeChallengeMethod: req.CodeChallengeMethod,
 		State:               req.State,
 		Scope:               req.Scope,
+		MultiAudiences:      multiAudiencesJSON,
 		CreatedAt:           time.Now(),
 		ExpiresAt:           time.Now().Add(10 * time.Minute),
 	}
@@ -79,7 +93,7 @@ func (s *Service) Authorize(ctx context.Context, req *AuthorizeRequest) (string,
 		return "", NewError(ErrServerError, "failed to create session")
 	}
 
-	logger.Infof("[Auth] 创建认证会话 - SessionID: %s, ClientID: %s", sessionID, req.ClientID)
+	logger.Infof("[Auth] 创建认证会话 - SessionID: %s, ClientID: %s, MultiAudiences: %v", sessionID, req.ClientID, len(req.MultiAudiences) > 0)
 
 	return sessionID, nil
 }
@@ -272,7 +286,7 @@ func (s *Service) Login(ctx context.Context, sessionID string, req *LoginRequest
 		return nil, NewError(ErrServerError, "failed to update session")
 	}
 
-	// 10. 生成授权码
+	// 10. 生成授权码（保存 sessionID 以便后续读取 multi_audiences）
 	authCode := GenerateAuthorizationCode()
 	authCodeObj := &AuthorizationCode{
 		Code:                authCode,
@@ -282,6 +296,7 @@ func (s *Service) Login(ctx context.Context, sessionID string, req *LoginRequest
 		CodeChallengeMethod: string(session.CodeChallengeMethod),
 		Scope:               grantedScopeStr, // 使用实际授予的 scope
 		UserID:              user.OpenID,
+		SessionID:           sessionID, // 保存 sessionID 以便后续读取 multi_audiences
 		CreatedAt:           time.Now(),
 		ExpiresAt:           time.Now().Add(5 * time.Minute),
 	}
@@ -356,19 +371,21 @@ func (s *Service) checkPreAuthRequirement(idp IDP, data map[string]string) strin
 
 // ============= Token =============
 
-// ExchangeToken 交换 Token
-func (s *Service) ExchangeToken(ctx context.Context, req *TokenRequest) (*TokenResponse, error) {
+// ExchangeToken Token 交换（统一入口）
+func (s *Service) ExchangeToken(ctx context.Context, c *gin.Context, req *TokenRequest) (interface{}, error) {
 	switch req.GrantType {
+	case GrantTypeClientCredentials:
+		return s.exchangeClientCredentials(ctx, c, req)
 	case GrantTypeAuthorizationCode:
 		return s.exchangeAuthorizationCode(ctx, req)
 	case GrantTypeRefreshToken:
 		return s.exchangeRefreshToken(ctx, req)
 	default:
-		return nil, NewError(ErrUnsupportedGrantType, "unsupported grant type")
+		return nil, NewError(ErrUnsupportedGrantType, "unsupported grant_type")
 	}
 }
 
-func (s *Service) exchangeAuthorizationCode(ctx context.Context, req *TokenRequest) (*TokenResponse, error) {
+func (s *Service) exchangeAuthorizationCode(ctx context.Context, req *TokenRequest) (interface{}, error) {
 	// 1. 获取授权码
 	authCode, err := s.store.GetAuthCode(ctx, req.Code)
 	if err != nil {
@@ -406,8 +423,39 @@ func (s *Service) exchangeAuthorizationCode(ctx context.Context, req *TokenReque
 		return nil, NewError(ErrInvalidClient, "client not found")
 	}
 
-	// 7. 生成 Token（使用授权码中的 scope）
-	return s.generateTokens(ctx, client, user, authCode.Scope)
+	// 7. 从 Session 中读取 multi_audiences
+	session, err := s.store.GetSessionByAuthCode(ctx, req.Code)
+	if err != nil {
+		return nil, NewError(ErrServerError, "session not found")
+	}
+
+	// 8. 判断是单服务还是多服务
+	if session.MultiAudiences == "" {
+		// 单服务：返回 TokenResponse
+		return s.generateTokenResponse(ctx, client, user, authCode.Scope)
+	}
+
+	// 9. 多服务：返回 map[string]TokenResponse
+	var multiAudiences map[string]AudienceRequest
+	if err := json.Unmarshal([]byte(session.MultiAudiences), &multiAudiences); err != nil {
+		return nil, NewError(ErrServerError, "failed to parse multi_audiences")
+	}
+
+	result := make(MultiTokenResponse)
+	for audience, audienceReq := range multiAudiences {
+		tokenResp, err := s.generateTokenResponseForAudience(ctx, client, user, audience, audienceReq.Scope)
+		if err != nil {
+			logger.Warnf("[Auth] 生成凭证失败 - Audience: %s, Error: %v", audience, err)
+			continue
+		}
+		result[audience] = *tokenResp
+	}
+
+	if len(result) == 0 {
+		return nil, NewError(ErrServerError, "failed to generate any credentials")
+	}
+
+	return result, nil
 }
 
 func (s *Service) exchangeRefreshToken(ctx context.Context, req *TokenRequest) (*TokenResponse, error) {
@@ -744,6 +792,280 @@ func (s *Service) findOrCreateUser(idp IDP, result *IDPResult) (*User, error) {
 	return &user, nil
 }
 
+// generateTokenResponse 生成单服务的 TokenResponse
+func (s *Service) generateTokenResponse(ctx context.Context, client *Client, user *User, scope string) (*TokenResponse, error) {
+	return s.generateTokens(ctx, client, user, scope)
+}
+
+// generateTokenResponseForAudience 为指定服务生成 TokenResponse
+func (s *Service) generateTokenResponseForAudience(
+	ctx context.Context,
+	client *Client,
+	user *User,
+	audience string,
+	scopes []string,
+) (*TokenResponse, error) {
+	scopeStr := JoinScopes(scopes)
+
+	// 获取服务配置
+	var service models.Service
+	if err := s.db.Where("service_id = ?", audience).First(&service).Error; err != nil {
+		return nil, fmt.Errorf("service not found: %w", err)
+	}
+
+	if service.Status != 0 {
+		return nil, fmt.Errorf("service is disabled")
+	}
+
+	// 解密服务密钥
+	domainEncryptKey, err := config.GetDomainEncryptKey(service.DomainID)
+	if err != nil {
+		return nil, fmt.Errorf("get domain encrypt key: %w", err)
+	}
+
+	encryptedKeyBytes, err := base64.StdEncoding.DecodeString(service.EncryptedKey)
+	if err != nil {
+		return nil, fmt.Errorf("decode encrypted key: %w", err)
+	}
+
+	serviceKey, err := kms.DecryptAESGCM(domainEncryptKey, encryptedKeyBytes, service.ServiceID)
+	if err != nil {
+		return nil, fmt.Errorf("decrypt service key: %w", err)
+	}
+
+	// 生成 JWT（包含用户信息 sub = user.OpenID）
+	accessToken, err := s.tokenManager.CreateServiceJWT(
+		service.ServiceID,
+		user.OpenID, // sub = 用户 OpenID
+		scopeStr,
+		serviceKey,
+		time.Duration(service.AccessTokenExpiresIn)*time.Second,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create jwt: %w", err)
+	}
+
+	resp := &TokenResponse{
+		AccessToken: accessToken,
+		TokenType:   "Bearer",
+		ExpiresIn:   service.AccessTokenExpiresIn,
+		Scope:       scopeStr,
+	}
+
+	// 如果包含 offline_access，生成 refresh_token
+	parsedScopes := ParseScopes(scopeStr)
+	if ContainsScope(parsedScopes, ScopeOfflineAccess) {
+		refreshTTL := time.Duration(service.RefreshTokenExpiresIn) * time.Second
+		if refreshTTL == 0 {
+			refreshTTL = 7 * 24 * time.Hour
+		}
+		refreshTokenValue, err := s.tokenManager.CreateRefreshToken(user.OpenID, audience, scopeStr, refreshTTL)
+		if err != nil {
+			return nil, fmt.Errorf("create refresh token: %w", err)
+		}
+		refreshToken := &RefreshToken{
+			Token:     refreshTokenValue,
+			UserID:    user.OpenID,
+			ClientID:  audience,
+			Scope:     scopeStr,
+			ExpiresAt: time.Now().Add(refreshTTL),
+			CreatedAt: time.Now(),
+		}
+		if err := s.store.SaveRefreshToken(ctx, refreshToken); err != nil {
+			return nil, fmt.Errorf("save refresh token: %w", err)
+		}
+		resp.RefreshToken = refreshTokenValue
+	}
+
+	return resp, nil
+}
+
+// exchangeClientCredentials 处理 Client Credentials grant type
+func (s *Service) exchangeClientCredentials(ctx context.Context, c *gin.Context, req *TokenRequest) (interface{}, error) {
+	// 1. 从 Authorization header 获取 Client JWT
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+		return nil, NewError(ErrInvalidRequest, "missing or invalid Authorization header")
+	}
+
+	clientJWT := strings.TrimPrefix(authHeader, "Bearer ")
+
+	// 2. 验证并解析 Client JWT
+	clientID, audiences, err := s.verifyClientJWT(ctx, clientJWT)
+	if err != nil {
+		return nil, NewError(ErrInvalidClient, fmt.Sprintf("invalid client jwt: %v", err))
+	}
+
+	// 3. 获取客户端配置
+	client, err := s.getClient(clientID)
+	if err != nil {
+		return nil, NewError(ErrInvalidClient, "client not found")
+	}
+
+	// 4. 验证客户端是否支持 client_credentials grant type
+	if !client.SupportsGrantType(GrantTypeClientCredentials) {
+		return nil, NewError(ErrUnauthorizedClient, "client does not support client_credentials grant type")
+	}
+
+	// 5. 判断单服务还是多服务
+	if len(req.MultiAudiences) == 0 {
+		// 单服务：从 Client JWT 的 aud 中取第一个
+		if len(audiences) == 0 {
+			return nil, NewError(ErrInvalidRequest, "no audience in client jwt")
+		}
+		audience := audiences[0]
+		tokenResp, err := s.generateServiceTokenResponse(ctx, client, audience, nil)
+		if err != nil {
+			return nil, err
+		}
+		return tokenResp, nil
+	}
+
+	// 6. 多服务：为每个 audience 生成凭证
+	result := make(MultiTokenResponse)
+	for audience, audienceReq := range req.MultiAudiences {
+		// 验证 audience 是否在 Client JWT 的 aud 中
+		if !contains(audiences, audience) {
+			logger.Warnf("[Auth] Audience %s not in client jwt audiences: %v", audience, audiences)
+			continue
+		}
+
+		tokenResp, err := s.generateServiceTokenResponse(ctx, client, audience, audienceReq.Scope)
+		if err != nil {
+			logger.Warnf("[Auth] 生成服务凭证失败 - Audience: %s, Error: %v", audience, err)
+			continue
+		}
+		result[audience] = *tokenResp
+	}
+
+	if len(result) == 0 {
+		return nil, NewError(ErrServerError, "failed to generate any service credentials")
+	}
+
+	return result, nil
+}
+
+// verifyClientJWT 验证并解析 Client JWT
+func (s *Service) verifyClientJWT(ctx context.Context, clientJWT string) (clientID string, audiences []string, err error) {
+	// 解析 JWT（不验证签名）
+	token, err := jwt.Parse([]byte(clientJWT), jwt.WithVerify(false))
+	if err != nil {
+		return "", nil, fmt.Errorf("parse jwt: %w", err)
+	}
+
+	// 获取 client_id（从 sub 或 iss）
+	var sub, iss interface{}
+	_ = token.Get(jwt.SubjectKey, &sub)
+	_ = token.Get(jwt.IssuerKey, &iss)
+
+	if subStr, ok := sub.(string); ok && subStr != "" {
+		clientID = subStr
+	} else if issStr, ok := iss.(string); ok && issStr != "" {
+		clientID = issStr
+	} else {
+		return "", nil, errors.New("missing client_id in jwt")
+	}
+
+	// 获取 audiences
+	var aud interface{}
+	_ = token.Get(jwt.AudienceKey, &aud)
+	if audSlice, ok := aud.([]string); ok {
+		audiences = audSlice
+	} else if audStr, ok := aud.(string); ok {
+		audiences = []string{audStr}
+	}
+
+	// 验证签名（使用客户端的 client_key）
+	client, err := s.getClient(clientID)
+	if err != nil {
+		return "", nil, fmt.Errorf("client not found: %w", err)
+	}
+
+	// TODO: 解密 client_key（需要添加 ClientKey 字段到 Client 模型）
+	// 这里先跳过签名验证，后续实现
+	_ = client
+
+	// 验证过期时间
+	var exp interface{}
+	_ = token.Get(jwt.ExpirationKey, &exp)
+	if expInt, ok := exp.(int64); ok {
+		if time.Now().Unix() > expInt {
+			return "", nil, errors.New("jwt expired")
+		}
+	}
+
+	return clientID, audiences, nil
+}
+
+// generateServiceTokenResponse 为指定服务生成 TokenResponse（client_credentials）
+func (s *Service) generateServiceTokenResponse(
+	ctx context.Context,
+	client *Client,
+	audience string,
+	scopes []string,
+) (*TokenResponse, error) {
+	// 获取服务配置
+	var service models.Service
+	if err := s.db.Where("service_id = ?", audience).First(&service).Error; err != nil {
+		return nil, fmt.Errorf("service not found: %w", err)
+	}
+
+	if service.Status != 0 {
+		return nil, fmt.Errorf("service is disabled")
+	}
+
+	// 解密服务密钥
+	domainEncryptKey, err := config.GetDomainEncryptKey(service.DomainID)
+	if err != nil {
+		return nil, fmt.Errorf("get domain encrypt key: %w", err)
+	}
+
+	encryptedKeyBytes, err := base64.StdEncoding.DecodeString(service.EncryptedKey)
+	if err != nil {
+		return nil, fmt.Errorf("decode encrypted key: %w", err)
+	}
+
+	serviceKey, err := kms.DecryptAESGCM(domainEncryptKey, encryptedKeyBytes, service.ServiceID)
+	if err != nil {
+		return nil, fmt.Errorf("decrypt service key: %w", err)
+	}
+
+	// 确定 scope
+	scopeStr := "openid profile" // 默认 scope
+	if len(scopes) > 0 {
+		scopeStr = JoinScopes(scopes)
+	}
+
+	// 生成服务 JWT（无 sub 字段）
+	accessToken, err := s.tokenManager.CreateServiceJWT(
+		service.ServiceID,
+		"", // 服务令牌：sub 为空
+		scopeStr,
+		serviceKey,
+		time.Duration(service.AccessTokenExpiresIn)*time.Second,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create service jwt: %w", err)
+	}
+
+	return &TokenResponse{
+		AccessToken: accessToken,
+		TokenType:   "Bearer",
+		ExpiresIn:   service.AccessTokenExpiresIn,
+		Scope:       scopeStr,
+	}, nil
+}
+
+// contains 检查字符串是否在切片中
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Service) generateTokens(ctx context.Context, client *Client, user *User, scope string) (*TokenResponse, error) {
 	now := time.Now()
 
@@ -784,7 +1106,7 @@ func (s *Service) generateTokens(ctx context.Context, client *Client, user *User
 	}
 
 	// 创建 Access Token（统一使用 access_token）
-	accessToken, err := s.tokenManager.CreateAccessToken(subjectClaims, client.ClientID, scope, accessTTL)
+	accessToken, err := s.tokenManager.CreateAccessToken(subjectClaims, client, scope, accessTTL)
 	if err != nil {
 		return nil, fmt.Errorf("create token: %w", err)
 	}
