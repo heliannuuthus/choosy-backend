@@ -90,11 +90,17 @@ verify-key = ""  # 支付宝公钥（PKCS8 DER Base64，上传应用公钥后支
 # 认证配置
 [auth]
 issuer = "zwei.heliannuuthus.com"
-audience = "zwei"
+endpoint = "https://zwei.heliannuuthus.com"  # Auth 服务端点（用于验证 token，/pubkeys?client_id= 路径自动拼接）
 expires-in = 7200           # access_token 过期时间(秒)，2小时
 refresh-expires-in = 365     # refresh_token 过期时间(天)，1年
 max-refresh-token = 10       # 每用户最大 refresh_token 数
 service-url = "http://localhost:18000"  # Auth 服务地址（zwei 模块调用时使用）
+
+# 支持的 audience 及其解密密钥（用于后端服务验证 token）
+# 每个 key 是 audience（服务 ID），value 是 base64url 编码的 JWK JSON
+[auth.secrets]
+# zwei = "base64url_encoded_jwk_json"
+# hermes = "base64url_encoded_jwk_json"
 
 # 域配置（Domain 配置，密钥使用 python3 scripts/genkeys.py 生成）
 [auth.domains.ciam]
@@ -131,6 +137,58 @@ image-url = "https://example.com/banner2.jpg"
 title = "新菜上线"
 link = "recipe_id_here"
 link-type = "recipe"
+
+# Hermes 缓存配置（用于 auth 模块缓存 hermes 数据）
+# 每个 cache 类型都有独立的配置前缀，支持独立配置和热更新
+# 配置格式：auth.cache.{type}.{config-key}
+
+# Domain 缓存配置（含密钥）
+[auth.cache.domain]
+key-prefix = "domain:"        # 缓存 key 前缀
+cache-size = 100             # 最大缓存条目数
+num-counters = 1000          # 计数器数量（ristretto 内部使用）
+buffer-items = 64           # 缓冲区大小
+ttl = "5m"                   # 缓存过期时间（支持热更新）
+
+# Application 缓存配置（含密钥）
+[auth.cache.application]
+key-prefix = "app:"          # 缓存 key 前缀
+cache-size = 500             # 最大缓存条目数
+num-counters = 5000          # 计数器数量
+buffer-items = 64            # 缓冲区大小
+ttl = "2m"                   # 缓存过期时间（支持热更新）
+
+# Service 缓存配置（含密钥）
+[auth.cache.service]
+key-prefix = "svc:"          # 缓存 key 前缀
+cache-size = 500             # 最大缓存条目数
+num-counters = 5000          # 计数器数量
+buffer-items = 64            # 缓冲区大小
+ttl = "2m"                   # 缓存过期时间（支持热更新）
+
+# User 缓存配置
+[auth.cache.user]
+key-prefix = "user:"         # 缓存 key 前缀
+cache-size = 10000           # 最大缓存条目数
+num-counters = 100000        # 计数器数量
+buffer-items = 64            # 缓冲区大小
+ttl = "10m"                  # 缓存过期时间（支持热更新）
+
+# ApplicationServiceRelation 缓存配置（应用可申请的服务关系）
+[auth.cache.application-service-relation]
+key-prefix = "app-svc-rel:"  # 缓存 key 前缀
+cache-size = 2000            # 最大缓存条目数
+num-counters = 20000         # 计数器数量
+buffer-items = 64            # 缓冲区大小
+ttl = "5m"                   # 缓存过期时间（支持热更新）
+
+# Relationship 缓存配置（服务关系）
+[auth.cache.relationship]
+key-prefix = "rel:"          # 缓存 key 前缀
+cache-size = 5000            # 最大缓存条目数
+num-counters = 50000         # 计数器数量
+buffer-items = 64            # 缓冲区大小
+ttl = "5m"                   # 缓存过期时间（支持热更新）
 
 # 阿里云 OSS 配置（用于图片上传）
 [oss]

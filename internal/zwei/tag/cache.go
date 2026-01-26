@@ -6,7 +6,7 @@ import (
 
 	"github.com/heliannuuthus/helios/internal/zwei/models"
 
-	"github.com/dgraph-io/ristretto"
+	"github.com/dgraph-io/ristretto/v2"
 	"gorm.io/gorm"
 )
 
@@ -22,7 +22,7 @@ const (
 
 // tagCache 标签定义缓存（使用 Ristretto + 按类型分组的索引）
 type tagCache struct {
-	cache *ristretto.Cache
+	cache *ristretto.Cache[string, any]
 	// 按类型分组的索引：map[TagType][]*Tag
 	// 使用 sync.Map 因为读多写少，读操作无锁
 	typeIndex sync.Map // map[models.TagType][]*models.Tag
@@ -39,7 +39,7 @@ var (
 func getTagCache() *tagCache {
 	cacheOnce.Do(func() {
 		// 初始化 Ristretto 缓存
-		ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
+		ristrettoCache, err := ristretto.NewCache(&ristretto.Config[string, any]{
 			NumCounters: tagCacheNumCounters,
 			MaxCost:     tagCacheSize,
 			BufferItems: tagCacheBufferItems,

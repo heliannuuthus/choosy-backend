@@ -346,3 +346,33 @@ func (h *Handler) Introspect(c *gin.Context) {
 func (h *Handler) errorResponse(c *gin.Context, status int, err *Error) {
 	c.JSON(status, err)
 }
+
+// JWKS GET /.well-known/jwks.json
+// @Summary 获取 JWKS（JSON Web Key Set）
+// @Description 根据 client_id 返回其所属域的公钥，用于验证 JWT 签名
+// @Tags auth
+// @Param client_id query string true "客户端 ID"
+// @Success 200 {object} map[string]interface{} "JWKS 格式的公钥列表"
+// @Failure 400 {object} Error
+// @Failure 404 {object} Error
+// @Router /.well-known/jwks.json [get]
+func (h *Handler) JWKS(c *gin.Context) {
+	clientID := c.Query("client_id")
+	if clientID == "" {
+		h.errorResponse(c, http.StatusBadRequest, NewError(ErrInvalidRequest, "client_id is required"))
+		return
+	}
+
+	// 获取 JWKS
+	jwks, err := h.service.GetJWKS(c.Request.Context(), clientID)
+	if err != nil {
+		if authErr, ok := err.(*Error); ok {
+			h.errorResponse(c, http.StatusNotFound, authErr)
+		} else {
+			h.errorResponse(c, http.StatusInternalServerError, NewError(ErrServerError, err.Error()))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, jwks)
+}

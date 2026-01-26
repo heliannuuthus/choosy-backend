@@ -79,6 +79,7 @@ const (
 type AuthorizeRequest struct {
 	ResponseType        string              `form:"response_type" binding:"required,oneof=code"` // 只允许 code
 	ClientID            string              `form:"client_id" binding:"required"`
+	Audience            string              `form:"audience" binding:"required"` // 目标服务 ID
 	RedirectURI         string              `form:"redirect_uri" binding:"required"`
 	CodeChallenge       string              `form:"code_challenge" binding:"required"`
 	CodeChallengeMethod CodeChallengeMethod `form:"code_challenge_method" binding:"required,oneof=S256"` // 只允许 S256
@@ -235,6 +236,7 @@ func NewError(code, description string) *Error {
 type Session struct {
 	ID                  string              `json:"id"`
 	ClientID            string              `json:"client_id"`
+	Audience            string              `json:"audience"`     // 目标服务 ID
 	RedirectURI         string              `json:"redirect_uri"`
 	CodeChallenge       string              `json:"code_challenge"`
 	CodeChallengeMethod CodeChallengeMethod `json:"code_challenge_method"`
@@ -254,6 +256,7 @@ type Session struct {
 type AuthorizationCode struct {
 	Code                string    `json:"code"`
 	ClientID            string    `json:"client_id"`
+	Audience            string    `json:"audience"` // 目标服务 ID
 	RedirectURI         string    `json:"redirect_uri"`
 	CodeChallenge       string    `json:"code_challenge"`
 	CodeChallengeMethod string    `json:"code_challenge_method"`
@@ -275,12 +278,17 @@ type SubjectClaims struct {
 
 // Identity Token 解析后的身份信息
 type Identity struct {
-	UserID   string `json:"sub"`
-	Scope    string `json:"scope"`
-	Nickname string `json:"nickname,omitempty"`
-	Picture  string `json:"picture,omitempty"`
-	Email    string `json:"email,omitempty"`
-	Phone    string `json:"phone,omitempty"`
+	UserID   string    `json:"sub"`
+	ClientID string    `json:"cli,omitempty"`      // 应用 ID（新版本 token）
+	Audience string    `json:"aud,omitempty"`      // 服务 ID（新版本 token）
+	Scope    string    `json:"scope"`
+	Nickname string    `json:"nickname,omitempty"`
+	Picture  string    `json:"picture,omitempty"`
+	Email    string    `json:"email,omitempty"`
+	Phone    string    `json:"phone,omitempty"`
+	Issuer   string    `json:"iss,omitempty"`      // 签发者
+	IssuedAt time.Time `json:"iat,omitempty"`      // 签发时间
+	ExpireAt time.Time `json:"exp,omitempty"`      // 过期时间
 }
 
 // GetOpenID 兼容旧接口

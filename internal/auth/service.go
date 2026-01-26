@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -11,9 +11,10 @@ import (
 	"time"
 
 	"github.com/heliannuuthus/helios/internal/config"
-	"github.com/heliannuuthus/helios/internal/hermes/models"
+	"github.com/heliannuuthus/helios/internal/hermes"
 	"github.com/heliannuuthus/helios/pkg/kms"
 	"github.com/heliannuuthus/helios/pkg/logger"
+	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jwt"
 	"gorm.io/gorm"
 )
@@ -24,10 +25,11 @@ type Service struct {
 	store        Store
 	tokenManager *TokenManager
 	idpManager   *IDPManager
+	hermesCache  *HermesCache
 }
 
 // NewService 创建认证服务
-func NewService(db *gorm.DB) (*Service, error) {
+func NewService(db *gorm.DB, hermesSvc *hermes.Service) (*Service, error) {
 	tokenManager, err := NewTokenManager()
 	if err != nil {
 		return nil, fmt.Errorf("create token manager: %w", err)
@@ -38,6 +40,7 @@ func NewService(db *gorm.DB) (*Service, error) {
 		store:        NewMemoryStore(), // TODO: 支持 Redis
 		tokenManager: tokenManager,
 		idpManager:   NewIDPManager(),
+		hermesCache:  NewHermesCache(hermesSvc),
 	}, nil
 }
 
@@ -61,11 +64,21 @@ func (s *Service) Authorize(ctx context.Context, req *AuthorizeRequest) (string,
 		return "", NewError(ErrInvalidRequest, "invalid redirect_uri")
 	}
 
-	// 4. 创建会话
+	// 4. 验证 Application-Service 关系
+	hasRelation, err := s.hermesCache.CheckApplicationServiceRelation(ctx, req.ClientID, req.Audience)
+	if err != nil {
+		return "", NewError(ErrServerError, fmt.Sprintf("check application service relation: %v", err))
+	}
+	if !hasRelation {
+		return "", NewError(ErrAccessDenied, fmt.Sprintf("application %s has no access to service %s", req.ClientID, req.Audience))
+	}
+
+	// 5. 创建会话
 	sessionID := GenerateSessionID()
 	session := &Session{
 		ID:                  sessionID,
 		ClientID:            req.ClientID,
+		Audience:            req.Audience,
 		RedirectURI:         req.RedirectURI,
 		CodeChallenge:       req.CodeChallenge,
 		CodeChallengeMethod: req.CodeChallengeMethod,
@@ -277,6 +290,7 @@ func (s *Service) Login(ctx context.Context, sessionID string, req *LoginRequest
 	authCodeObj := &AuthorizationCode{
 		Code:                authCode,
 		ClientID:            session.ClientID,
+		Audience:            session.Audience, // 目标服务 ID
 		RedirectURI:         session.RedirectURI,
 		CodeChallenge:       session.CodeChallenge,
 		CodeChallengeMethod: string(session.CodeChallengeMethod),
@@ -406,8 +420,8 @@ func (s *Service) exchangeAuthorizationCode(ctx context.Context, req *TokenReque
 		return nil, NewError(ErrInvalidClient, "client not found")
 	}
 
-	// 7. 生成 Token（使用授权码中的 scope）
-	return s.generateTokens(ctx, client, user, authCode.Scope)
+	// 7. 生成 Token（使用授权码中的 scope 和 audience）
+	return s.generateTokens(ctx, client, user, authCode.Audience, authCode.Scope)
 }
 
 func (s *Service) exchangeRefreshToken(ctx context.Context, req *TokenRequest) (*TokenResponse, error) {
@@ -438,8 +452,8 @@ func (s *Service) exchangeRefreshToken(ctx context.Context, req *TokenRequest) (
 		return nil, NewError(ErrInvalidClient, "client not found")
 	}
 
-	// 5. 生成新的 Access Token（使用 refresh token 中的 scope）
-	token, err := s.generateTokens(ctx, client, user, refreshToken.Scope)
+	// 5. 生成新的 Access Token（使用 refresh token 中的 scope 和 audience）
+	token, err := s.generateTokens(ctx, client, user, refreshToken.Audience, refreshToken.Scope)
 	if err != nil {
 		return nil, err
 	}
@@ -552,30 +566,14 @@ func (s *Service) verifyServiceJWT(tokenString string) (serviceID string, jti st
 
 	jtiVal, _ := token.JwtID()
 
-	// 从数据库获取 service（使用 sub 作为 service_id）
-	var service models.Service
-	if err := s.db.Where("service_id = ?", sub).First(&service).Error; err != nil {
+	// 从缓存获取带解密密钥的 Service
+	svcWithKey, err := s.hermesCache.GetServiceWithKey(context.Background(), sub)
+	if err != nil {
 		return "", "", fmt.Errorf("service not found: %w", err)
 	}
 
-	// 解密 service key
-	domainEncryptKey, err := config.GetDomainEncryptKey(service.DomainID)
-	if err != nil {
-		return "", "", fmt.Errorf("get domain encrypt key: %w", err)
-	}
-
-	encryptedKeyBytes, err := base64.StdEncoding.DecodeString(service.EncryptedKey)
-	if err != nil {
-		return "", "", fmt.Errorf("decode encrypted key: %w", err)
-	}
-
-	serviceKey, err := kms.DecryptAESGCM(domainEncryptKey, encryptedKeyBytes, service.ServiceID)
-	if err != nil {
-		return "", "", fmt.Errorf("decrypt service key: %w", err)
-	}
-
 	// 验证 JWT 签名
-	verifiedServiceID, verifiedJti, verifyErr := s.tokenManager.VerifyServiceJWT(tokenString, serviceKey)
+	verifiedServiceID, verifiedJti, verifyErr := s.tokenManager.VerifyServiceJWT(tokenString, svcWithKey.Key)
 	if verifyErr != nil {
 		return "", "", fmt.Errorf("verify service jwt: %w", verifyErr)
 	}
@@ -744,20 +742,60 @@ func (s *Service) findOrCreateUser(idp IDP, result *IDPResult) (*User, error) {
 	return &user, nil
 }
 
-func (s *Service) generateTokens(ctx context.Context, client *Client, user *User, scope string) (*TokenResponse, error) {
+func (s *Service) generateTokens(ctx context.Context, client *Client, user *User, audience string, scope string) (*TokenResponse, error) {
 	now := time.Now()
 
-	accessTTL := time.Duration(client.AccessTokenExpiresIn) * time.Second
+	// 1. 验证 Application-Service 关系
+	hasRelation, err := s.hermesCache.CheckApplicationServiceRelation(ctx, client.ClientID, audience)
+	if err != nil {
+		return nil, fmt.Errorf("check application service relation: %w", err)
+	}
+	if !hasRelation {
+		return nil, NewError(ErrAccessDenied, fmt.Sprintf("application %s has no access to service %s", client.ClientID, audience))
+	}
+
+	// 2. 获取 Service 和域密钥
+	svcWithKey, err := s.hermesCache.GetServiceWithKey(ctx, audience)
+	if err != nil {
+		return nil, fmt.Errorf("get service: %w", err)
+	}
+
+	// 获取域签名密钥
+	domainWithKey, err := s.hermesCache.GetDomain(ctx, string(client.Domain))
+	if err != nil {
+		return nil, fmt.Errorf("get domain: %w", err)
+	}
+
+	// 将服务密钥转换为 JWK
+	serviceEncryptKey, err := jwk.Import(svcWithKey.Key)
+	if err != nil {
+		return nil, fmt.Errorf("import service key: %w", err)
+	}
+
+	// 将域签名密钥转换为 JWK
+	signKey, err := jwk.ParseKey(domainWithKey.SignKey)
+	if err != nil {
+		return nil, fmt.Errorf("parse sign key: %w", err)
+	}
+
+	// 3. 计算 TTL（优先使用服务配置，其次使用客户端配置，最后使用全局配置）
+	accessTTL := time.Duration(svcWithKey.AccessTokenExpiresIn) * time.Second
+	if accessTTL == 0 {
+		accessTTL = time.Duration(client.AccessTokenExpiresIn) * time.Second
+	}
 	if accessTTL == 0 {
 		accessTTL = time.Duration(config.GetInt("auth.expires-in")) * time.Second
 	}
 
-	refreshTTL := time.Duration(client.RefreshTokenExpiresIn) * time.Second
+	refreshTTL := time.Duration(svcWithKey.RefreshTokenExpiresIn) * time.Second
+	if refreshTTL == 0 {
+		refreshTTL = time.Duration(client.RefreshTokenExpiresIn) * time.Second
+	}
 	if refreshTTL == 0 {
 		refreshTTL = time.Duration(config.GetInt("auth.refresh-expires-in")) * 24 * time.Hour
 	}
 
-	// 解析 scope，确定要包含哪些用户信息
+	// 4. 解析 scope，确定要包含哪些用户信息
 	scopes := ParseScopes(scope)
 
 	// 构建 SubjectClaims（加密到 sub）
@@ -783,8 +821,16 @@ func (s *Service) generateTokens(ctx context.Context, client *Client, user *User
 		}
 	}
 
-	// 创建 Access Token（统一使用 access_token）
-	accessToken, err := s.tokenManager.CreateAccessToken(subjectClaims, client.ClientID, scope, accessTTL)
+	// 5. 创建 Access Token（使用新版本 API）
+	accessToken, err := s.tokenManager.CreateAccessTokenV2(
+		subjectClaims,
+		client.ClientID, // cli
+		audience,        // aud
+		serviceEncryptKey,
+		signKey,
+		scope,
+		accessTTL,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("create token: %w", err)
 	}
@@ -796,7 +842,7 @@ func (s *Service) generateTokens(ctx context.Context, client *Client, user *User
 		Scope:       scope,
 	}
 
-	// 只有 scope 包含 offline_access 时才返回 refresh_token
+	// 6. 只有 scope 包含 offline_access 时才返回 refresh_token
 	if ContainsScope(scopes, ScopeOfflineAccess) {
 		// 清理旧的 Refresh Token
 		s.cleanupOldRefreshTokens(ctx, user.OpenID, client.ClientID)
@@ -806,6 +852,7 @@ func (s *Service) generateTokens(ctx context.Context, client *Client, user *User
 			Token:     GenerateRefreshTokenValue(),
 			UserID:    user.OpenID,
 			ClientID:  client.ClientID,
+			Audience:  audience, // 新增
 			Scope:     scope,
 			ExpiresAt: now.Add(refreshTTL),
 			CreatedAt: now,
@@ -859,4 +906,49 @@ func generateRandomAvatar(seed string) string {
 		hash = -hash
 	}
 	return fmt.Sprintf("https://api.dicebear.com/7.x/avataaars/svg?seed=%s&size=200", fmt.Sprintf("user%d", hash%10))
+}
+
+// GetJWKS 获取 JWKS（根据 client_id 返回其所属域的公钥）
+func (s *Service) GetJWKS(ctx context.Context, clientID string) (map[string]interface{}, error) {
+	// 1. 获取 Application
+	app, err := s.hermesCache.GetApplication(ctx, clientID)
+	if err != nil {
+		return nil, NewError(ErrInvalidClient, "client not found")
+	}
+
+	// 2. 获取域信息和公钥
+	domain, err := s.hermesCache.GetDomain(ctx, app.DomainID)
+	if err != nil {
+		return nil, NewError(ErrServerError, fmt.Sprintf("domain not found: %v", err))
+	}
+
+	// 3. 解析签名密钥获取公钥
+	signKey, err := jwk.ParseKey(domain.SignKey)
+	if err != nil {
+		return nil, NewError(ErrServerError, fmt.Sprintf("parse sign key: %v", err))
+	}
+
+	// 获取公钥
+	publicKey, err := signKey.PublicKey()
+	if err != nil {
+		return nil, NewError(ErrServerError, fmt.Sprintf("get public key: %v", err))
+	}
+
+	// 4. 构建 JWKS 响应
+	// 使用 jwk.Set 来构建 JWKS
+	set := jwk.NewSet()
+	_ = set.AddKey(publicKey)
+
+	// 将 Set 序列化为 JSON 后再解析为 map
+	jsonBytes, err := json.Marshal(set)
+	if err != nil {
+		return nil, NewError(ErrServerError, fmt.Sprintf("marshal jwks: %v", err))
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(jsonBytes, &result); err != nil {
+		return nil, NewError(ErrServerError, fmt.Sprintf("unmarshal jwks: %v", err))
+	}
+
+	return result, nil
 }

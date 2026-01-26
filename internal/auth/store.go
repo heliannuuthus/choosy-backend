@@ -37,6 +37,7 @@ type RefreshToken struct {
 	Token     string    `json:"token"`
 	UserID    string    `json:"user_id"` // 实际存储的是用户的 OpenID
 	ClientID  string    `json:"client_id"`
+	Audience  string    `json:"audience"` // 目标服务 ID
 	Scope     string    `json:"scope"`
 	ExpiresAt time.Time `json:"expires_at"`
 	Revoked   bool      `json:"revoked"`

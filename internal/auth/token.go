@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -17,11 +18,20 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwt"
 )
 
+// Token 验证错误
+var (
+	ErrUnsupportedAudience = errors.New("unsupported audience")
+	ErrTokenExpired        = errors.New("token expired")
+	ErrInvalidSignature    = errors.New("invalid signature")
+	ErrMissingClaims       = errors.New("missing required claims")
+)
+
 // TokenManager Token 管理器
+// 支持 token 的签发（Auth 模块使用）
 type TokenManager struct {
 	issuer     string
-	signingKey jwk.Key
-	encryptKey jwk.Key
+	signingKey jwk.Key // 默认签名密钥（用于旧接口兼容）
+	encryptKey jwk.Key // 默认加密密钥（用于旧接口兼容）
 }
 
 // NewTokenManager 创建 Token 管理器
@@ -30,7 +40,7 @@ func NewTokenManager() (*TokenManager, error) {
 		issuer: config.GetString("auth.issuer"),
 	}
 
-	// 加载签名密钥
+	// 加载默认签名密钥（兼容旧接口）
 	signKeyB64 := config.GetString("kms.token.sign-key")
 	if signKeyB64 != "" {
 		keyBytes, err := base64.RawURLEncoding.DecodeString(signKeyB64)
@@ -44,7 +54,7 @@ func NewTokenManager() (*TokenManager, error) {
 		tm.signingKey = key
 	}
 
-	// 加载加密密钥
+	// 加载默认加密密钥（兼容旧接口）
 	encKeyB64 := config.GetString("kms.token.enc-key")
 	if encKeyB64 != "" {
 		keyBytes, err := base64.RawURLEncoding.DecodeString(encKeyB64)
@@ -61,8 +71,9 @@ func NewTokenManager() (*TokenManager, error) {
 	return tm, nil
 }
 
-// CreateAccessToken 创建 Access Token
+// CreateAccessToken 创建 Access Token（兼容旧接口）
 // sub 字段包含加密的用户信息（openid, nickname, picture, email, phone）
+// Deprecated: 使用 CreateAccessTokenV2 替代
 func (tm *TokenManager) CreateAccessToken(claims *SubjectClaims, clientID string, scope string, ttl time.Duration) (string, error) {
 	now := time.Now()
 
@@ -96,6 +107,21 @@ func (tm *TokenManager) CreateAccessToken(claims *SubjectClaims, clientID string
 	}
 
 	return string(signedToken), nil
+}
+
+// CreateAccessTokenV2 创建 Access Token（新版本）
+// Deprecated: 使用 Issuer.Issue 替代
+func (tm *TokenManager) CreateAccessTokenV2(
+	claims *SubjectClaims,
+	clientID string,
+	audience string,
+	serviceEncryptKey jwk.Key,
+	signKey jwk.Key,
+	scope string,
+	ttl time.Duration,
+) (string, error) {
+	issuer := NewIssuer(tm.issuer)
+	return issuer.Issue(claims, clientID, audience, serviceEncryptKey, signKey, scope, ttl)
 }
 
 // VerifyAccessToken 验证 Access Token，返回完整身份信息
@@ -269,3 +295,105 @@ func VerifyAccessToken(tokenString string) (*Identity, error) {
 	}
 	return tm.VerifyAccessToken(tokenString)
 }
+
+// ExplainToken 验证并解释 token，返回完整身份信息
+// Deprecated: 使用 pkg/token.Verifier.Verify 替代
+func ExplainToken(ctx context.Context, tokenString string, expectedAudience string, decryptKey jwk.Key, getPublicKey func(ctx context.Context, clientID string) (jwk.Key, error)) (*Identity, error) {
+	// 1. 解析 JWT（不验证）获取 claims
+	token, err := jwt.Parse([]byte(tokenString), jwt.WithVerify(false))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidSignature, err)
+	}
+
+	// 获取 aud (audience/service_id)
+	audVal, ok := token.Audience()
+	if !ok || len(audVal) == 0 {
+		return nil, fmt.Errorf("%w: missing aud", ErrMissingClaims)
+	}
+	audience := audVal[0]
+
+	// 检查 audience 是否匹配
+	if audience != expectedAudience {
+		return nil, fmt.Errorf("%w: expected %s, got %s", ErrUnsupportedAudience, expectedAudience, audience)
+	}
+
+	// 获取 cli (client_id)
+	var clientID string
+	if err := token.Get("cli", &clientID); err != nil || clientID == "" {
+		return nil, fmt.Errorf("%w: missing cli", ErrMissingClaims)
+	}
+
+	// 2. 获取域公钥验证签名
+	publicKey, err := getPublicKey(ctx, clientID)
+	if err != nil {
+		return nil, fmt.Errorf("get public key: %w", err)
+	}
+
+	// 验证签名
+	_, err = jwt.Parse([]byte(tokenString),
+		jwt.WithKey(jwa.EdDSA(), publicKey),
+		jwt.WithValidate(true),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidSignature, err)
+	}
+
+	// 3. 解密 sub 获取用户信息
+	encryptedSub, ok := token.Subject()
+	if !ok {
+		return nil, fmt.Errorf("%w: missing sub", ErrMissingClaims)
+	}
+
+	claims, err := decryptSubjectClaimsLegacy(encryptedSub, decryptKey)
+	if err != nil {
+		return nil, fmt.Errorf("decrypt sub: %w", err)
+	}
+
+	// 获取其他字段
+	var scope string
+	_ = token.Get("scope", &scope)
+
+	issuer, _ := token.Issuer()
+	issuedAt, _ := token.IssuedAt()
+	expireAt, _ := token.Expiration()
+
+	return &Identity{
+		UserID:   claims.OpenID,
+		ClientID: clientID,
+		Audience: audience,
+		Scope:    scope,
+		Nickname: claims.Nickname,
+		Picture:  claims.Picture,
+		Email:    claims.Email,
+		Phone:    claims.Phone,
+		Issuer:   issuer,
+		IssuedAt: issuedAt,
+		ExpireAt: expireAt,
+	}, nil
+}
+
+// decryptSubjectClaimsLegacy 使用指定密钥解密用户信息（旧版兼容）
+func decryptSubjectClaimsLegacy(encryptedSub string, decryptKey jwk.Key) (*SubjectClaims, error) {
+	var data []byte
+
+	if decryptKey == nil {
+		// 没有解密密钥则直接解析 JSON
+		data = []byte(encryptedSub)
+	} else {
+		decrypted, err := jwe.Decrypt([]byte(encryptedSub),
+			jwe.WithKey(jwa.DIRECT(), decryptKey),
+		)
+		if err != nil {
+			return nil, err
+		}
+		data = decrypted
+	}
+
+	var claims SubjectClaims
+	if err := json.Unmarshal(data, &claims); err != nil {
+		return nil, err
+	}
+
+	return &claims, nil
+}
+

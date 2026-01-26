@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
@@ -139,8 +140,10 @@ func V() *viper.Viper {
 // 便捷方法（viper 内部已线程安全）
 func GetString(key string) string                     { return V().GetString(key) }
 func GetInt(key string) int                           { return V().GetInt(key) }
+func GetInt64(key string) int64                       { return V().GetInt64(key) }
 func GetBool(key string) bool                         { return V().GetBool(key) }
 func GetStringSlice(key string) []string              { return V().GetStringSlice(key) }
 func GetStringMap(key string) map[string]any          { return V().GetStringMap(key) }
 func GetStringMapString(key string) map[string]string { return V().GetStringMapString(key) }
+func GetDuration(key string) time.Duration            { return V().GetDuration(key) }
 func Get(key string) any                              { return V().Get(key) }
