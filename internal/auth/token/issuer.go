@@ -20,22 +20,22 @@ type signer struct {
 }
 
 // Sign 签名 JWT Token
-// 通过 clientID 获取 Application -> domainID -> Domain -> SignKey
-func (s *signer) Sign(ctx context.Context, token jwt.Token, clientID string) ([]byte, error) {
+// 通过 AccessToken.GetClientID() 获取 Application -> domainID -> Domain -> SignKey
+func (s *signer) Sign(ctx context.Context, token jwt.Token, accessToken AccessToken) ([]byte, error) {
 	// 1. 获取应用信息
-	app, err := s.cache.GetApplication(ctx, clientID)
+	app, err := s.cache.GetApplication(ctx, accessToken.GetClientID())
 	if err != nil {
 		return nil, fmt.Errorf("get application: %w", err)
 	}
 
 	// 2. 获取域签名密钥
-	domainWithKey, err := s.cache.GetDomain(ctx, app.DomainID)
+	domain, err := s.cache.GetDomain(ctx, app.DomainID)
 	if err != nil {
 		return nil, fmt.Errorf("get domain: %w", err)
 	}
 
 	// 3. 解析签名密钥
-	signKey, err := jwk.ParseKey(domainWithKey.SignKey)
+	signKey, err := jwk.ParseKey(domain.SignKey)
 	if err != nil {
 		return nil, fmt.Errorf("parse sign key: %w", err)
 	}
@@ -55,16 +55,16 @@ type encryptor struct {
 }
 
 // Encrypt 加密用户信息
-// 通过 audience 获取 Service -> Key
-func (e *encryptor) Encrypt(ctx context.Context, claims *pkgtoken.Claims, audience string) (string, error) {
+// 通过 UserAccessToken.GetAudience() 获取 Service -> Key
+func (e *encryptor) Encrypt(ctx context.Context, uat *UserAccessToken) (string, error) {
 	// 1. 获取服务加密密钥
-	svc, err := e.cache.GetService(ctx, audience)
+	svc, err := e.cache.GetService(ctx, uat.GetAudience())
 	if err != nil {
 		return "", fmt.Errorf("get service key: %w", err)
 	}
 
 	// 2. 序列化 claims
-	data, err := json.Marshal(claims)
+	data, err := json.Marshal(uat.GetUser())
 	if err != nil {
 		return "", fmt.Errorf("marshal claims: %w", err)
 	}
@@ -135,14 +135,14 @@ func (i *Issuer) issueUserToken(ctx context.Context, uat *UserAccessToken) (stri
 	if uat.GetUser() == nil {
 		return "", errors.New("user claims required for UserAccessToken")
 	}
-	encryptedSub, err := i.encryptor.Encrypt(ctx, uat.GetUser(), uat.GetAudience())
+	encryptedSub, err := i.encryptor.Encrypt(ctx, uat)
 	if err != nil {
 		return "", fmt.Errorf("encrypt user claims: %w", err)
 	}
 	_ = token.Set(jwt.SubjectKey, encryptedSub)
 
 	// 3. 签名
-	signed, err := i.signer.Sign(ctx, token, uat.GetClientID())
+	signed, err := i.signer.Sign(ctx, token, uat)
 	if err != nil {
 		return "", fmt.Errorf("sign token: %w", err)
 	}
@@ -159,7 +159,7 @@ func (i *Issuer) issueServiceToken(ctx context.Context, sat *ServiceAccessToken)
 	}
 
 	// 2. 签名
-	signed, err := i.signer.Sign(ctx, token, sat.GetClientID())
+	signed, err := i.signer.Sign(ctx, token, sat)
 	if err != nil {
 		return "", fmt.Errorf("sign token: %w", err)
 	}
