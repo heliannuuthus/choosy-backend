@@ -11,29 +11,30 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwt"
 )
 
-// Verifier token 验证器
-type Verifier struct {
+// Explainer Token 解释器
+// 负责验证和解释 token，提取身份信息
+type Explainer struct {
 	publicKeyProvider KeyProvider // 获取公钥（验签）
 	secretProvider    KeyProvider // 获取解密密钥
 }
 
-// NewVerifier 创建验证器
+// NewExplainer 创建解释器
 // publicKeyProvider: 公钥提供者（根据 client_id 获取域公钥）
 // secretProvider: 解密密钥提供者（根据 audience 获取对称密钥）
-func NewVerifier(publicKeyProvider, secretProvider KeyProvider) *Verifier {
-	return &Verifier{
+func NewExplainer(publicKeyProvider, secretProvider KeyProvider) *Explainer {
+	return &Explainer{
 		publicKeyProvider: publicKeyProvider,
 		secretProvider:    secretProvider,
 	}
 }
 
-// Verify 验证 token 并返回身份信息
+// Explain 验证并解释 token，返回身份信息
 // 流程：
 // 1. 解析 JWT 获取 cli（client_id）和 aud（audience）
 // 2. 从 secretProvider 获取 aud 对应的解密密钥
 // 3. 从 publicKeyProvider 获取 cli 对应的公钥
 // 4. 验证签名 + 解密 sub
-func (v *Verifier) Verify(ctx context.Context, tokenString string) (*Identity, error) {
+func (e *Explainer) Explain(ctx context.Context, tokenString string) (*Identity, error) {
 	// 1. 解析 JWT（不验证）获取 claims
 	token, err := jwt.Parse([]byte(tokenString), jwt.WithVerify(false))
 	if err != nil {
@@ -54,13 +55,13 @@ func (v *Verifier) Verify(ctx context.Context, tokenString string) (*Identity, e
 	}
 
 	// 2. 获取解密密钥
-	decryptKey, err := v.secretProvider.Get(ctx, audience)
+	decryptKey, err := e.secretProvider.Get(ctx, audience)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrUnsupportedAudience, err)
 	}
 
 	// 3. 获取域公钥验证签名
-	publicKey, err := v.publicKeyProvider.Get(ctx, clientID)
+	publicKey, err := e.publicKeyProvider.Get(ctx, clientID)
 	if err != nil {
 		return nil, fmt.Errorf("get public key: %w", err)
 	}
@@ -131,4 +132,20 @@ func decryptSubjectClaims(encryptedSub string, decryptKey jwk.Key) (*SubjectClai
 	}
 
 	return &claims, nil
+}
+
+// Verifier 类型别名（向后兼容）
+// Deprecated: 使用 Explainer 替代
+type Verifier = Explainer
+
+// NewVerifier 向后兼容
+// Deprecated: 使用 NewExplainer 替代
+func NewVerifier(publicKeyProvider, secretProvider KeyProvider) *Verifier {
+	return NewExplainer(publicKeyProvider, secretProvider)
+}
+
+// Verify 向后兼容
+// Deprecated: 使用 Explain 替代
+func (e *Explainer) Verify(ctx context.Context, tokenString string) (*Identity, error) {
+	return e.Explain(ctx, tokenString)
 }

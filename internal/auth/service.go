@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/heliannuuthus/helios/internal/auth/cache"
 	"github.com/heliannuuthus/helios/internal/auth/token"
 	"github.com/heliannuuthus/helios/internal/config"
 	"github.com/heliannuuthus/helios/internal/hermes"
@@ -22,26 +23,26 @@ import (
 
 // Service 认证服务
 type Service struct {
-	db           *gorm.DB
-	store        Store
-	tokenManager *token.Manager
-	idpManager   *IDPManager
-	hermesCache  *HermesCache
+	db          *gorm.DB
+	store       Store
+	issuer      *token.Issuer
+	idpManager  *IDPManager
+	hermesCache *cache.HermesCache
 }
 
 // NewService 创建认证服务
 func NewService(db *gorm.DB, hermesSvc *hermes.Service) (*Service, error) {
-	tokenManager, err := token.NewManager()
+	issuer, err := token.NewIssuer()
 	if err != nil {
-		return nil, fmt.Errorf("create token manager: %w", err)
+		return nil, fmt.Errorf("create token issuer: %w", err)
 	}
 
 	return &Service{
-		db:           db,
-		store:        NewMemoryStore(), // TODO: 支持 Redis
-		tokenManager: tokenManager,
-		idpManager:   NewIDPManager(),
-		hermesCache:  NewHermesCache(hermesSvc),
+		db:          db,
+		store:       NewMemoryStore(), // TODO: 支持 Redis
+		issuer:      issuer,
+		idpManager:  NewIDPManager(),
+		hermesCache: cache.NewHermesCache(hermesSvc),
 	}, nil
 }
 
@@ -75,7 +76,7 @@ func (s *Service) Authorize(ctx context.Context, req *AuthorizeRequest) (string,
 	}
 
 	// 5. 创建会话
-	sessionID := token.GenerateSessionID()
+	sessionID := GenerateSessionID()
 	session := &Session{
 		ID:                  sessionID,
 		ClientID:            req.ClientID,
@@ -287,7 +288,7 @@ func (s *Service) Login(ctx context.Context, sessionID string, req *LoginRequest
 	}
 
 	// 10. 生成授权码
-	authCode := token.GenerateAuthorizationCode()
+	authCode := GenerateAuthorizationCode()
 	authCodeObj := &AuthorizationCode{
 		Code:                authCode,
 		ClientID:            session.ClientID,
@@ -401,7 +402,7 @@ func (s *Service) exchangeAuthorizationCode(ctx context.Context, req *TokenReque
 	}
 
 	// 4. 验证 PKCE
-	if !token.VerifyCodeChallenge(token.CodeChallengeMethod(authCode.CodeChallengeMethod), authCode.CodeChallenge, req.CodeVerifier) {
+	if !VerifyCodeChallenge(CodeChallengeMethod(authCode.CodeChallengeMethod), authCode.CodeChallenge, req.CodeVerifier) {
 		return nil, NewError(ErrInvalidGrant, "invalid code_verifier")
 	}
 
@@ -492,13 +493,13 @@ func (s *Service) Introspect(ctx context.Context, tokenString string, serviceJWT
 	_ = serviceID // 暂时未使用，后续可用于日志
 
 	// 3. 解析 Access Token（不验证，因为可能已过期）
-	aud, iss, exp, iat, scope, err := s.tokenManager.ParseAccessTokenUnverified(tokenString)
+	aud, iss, exp, iat, scope, err := s.issuer.ParseAccessTokenUnverified(tokenString)
 	if err != nil {
 		return &IntrospectResponse{Active: false}, nil
 	}
 
 	// 4. 验证 Token 签名和有效性
-	identity, err := s.tokenManager.VerifyAccessToken(tokenString)
+	identity, err := s.issuer.VerifyAccessToken(tokenString)
 	if err != nil {
 		return &IntrospectResponse{Active: false}, nil
 	}
@@ -574,7 +575,7 @@ func (s *Service) verifyServiceJWT(tokenString string) (serviceID string, jti st
 	}
 
 	// 验证 JWT 签名
-	verifiedServiceID, verifiedJti, verifyErr := s.tokenManager.VerifyServiceJWT(tokenString, svcWithKey.Key)
+	verifiedServiceID, verifiedJti, verifyErr := s.issuer.VerifyServiceJWT(tokenString, svcWithKey.Key)
 	if verifyErr != nil {
 		return "", "", fmt.Errorf("verify service jwt: %w", verifyErr)
 	}
@@ -823,7 +824,7 @@ func (s *Service) generateTokens(ctx context.Context, client *Client, user *User
 	}
 
 	// 5. 创建 Access Token（使用新版本 API）
-	accessToken, err := s.tokenManager.CreateAccessTokenV2(
+	accessToken, err := s.issuer.Issue(
 		subjectClaims,
 		client.ClientID, // cli
 		audience,        // aud

@@ -11,12 +11,12 @@ import (
 
 // Middleware 认证中间件
 type Middleware struct {
-	tokenManager *token.Manager
+	issuer *token.Issuer
 }
 
 // NewMiddleware 创建中间件
-func NewMiddleware(tokenManager *token.Manager) *Middleware {
-	return &Middleware{tokenManager: tokenManager}
+func NewMiddleware(issuer *token.Issuer) *Middleware {
+	return &Middleware{issuer: issuer}
 }
 
 // RequireAuth 要求认证
@@ -33,7 +33,7 @@ func (m *Middleware) RequireAuth() gin.HandlerFunc {
 		}
 
 		// 验证 Access Token（统一使用 access_token）
-		identity, err := m.tokenManager.VerifyAccessToken(token)
+		identity, err := m.issuer.VerifyAccessToken(token)
 		if err != nil {
 			c.Header("WWW-Authenticate", "Bearer error=\"invalid_token\"")
 			c.AbortWithStatusJSON(http.StatusUnauthorized, Error{
@@ -58,7 +58,7 @@ func (m *Middleware) OptionalAuth() gin.HandlerFunc {
 		}
 
 		// 验证 Access Token
-		identity, err := m.tokenManager.VerifyAccessToken(token)
+		identity, err := m.issuer.VerifyAccessToken(token)
 		if err == nil && identity != nil {
 			c.Set("identity", identity)
 		}
