@@ -1,13 +1,11 @@
 package token
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/heliannuuthus/helios/internal/config"
 	pkgtoken "github.com/heliannuuthus/helios/pkg/token"
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwe"
@@ -15,62 +13,49 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwt"
 )
 
+// KeyStore 密钥存储
+type KeyStore struct {
+	signKey    []byte // 签名密钥（原始字节）
+	encryptKey []byte // 加密密钥（原始字节）
+}
+
+// SetSignKey 设置签名密钥
+func (s *KeyStore) SetSignKey(key []byte) {
+	s.signKey = key
+}
+
+// SetEncryptKey 设置加密密钥
+func (s *KeyStore) SetEncryptKey(key []byte) {
+	s.encryptKey = key
+}
+
+// GetSignKey 获取签名密钥（解析为 JWK）
+func (s *KeyStore) GetSignKey() (jwk.Key, error) {
+	if s.signKey == nil {
+		return nil, errors.New("sign key not set")
+	}
+	return jwk.ParseKey(s.signKey)
+}
+
+// GetEncryptKey 获取加密密钥（解析为 JWK）
+func (s *KeyStore) GetEncryptKey() (jwk.Key, error) {
+	if s.encryptKey == nil {
+		return nil, errors.New("encrypt key not set")
+	}
+	return jwk.Import(s.encryptKey)
+}
+
 // Issuer Token 签发器
 type Issuer struct {
-	issuerName string    // issuer 字符串
-	encryptor  Encryptor // 加密器
-	signer     Signer    // 签名器
-
-	// 默认密钥（用于旧接口兼容）
-	signingKey jwk.Key
-	encryptKey jwk.Key
+	issuerName string
+	store      *KeyStore
 }
 
 // NewIssuer 创建 Token 签发器
-func NewIssuer() (*Issuer, error) {
-	i := &Issuer{
-		issuerName: config.GetString("auth.issuer"),
-	}
-
-	// 加载默认签名密钥（兼容旧接口）
-	signKeyB64 := config.GetString("kms.token.sign-key")
-	if signKeyB64 != "" {
-		keyBytes, err := base64.RawURLEncoding.DecodeString(signKeyB64)
-		if err != nil {
-			return nil, fmt.Errorf("decode signing key: %w", err)
-		}
-		key, err := jwk.ParseKey(keyBytes)
-		if err != nil {
-			return nil, fmt.Errorf("parse signing key: %w", err)
-		}
-		i.signingKey = key
-		i.signer = NewEdDSASigner(key)
-	}
-
-	// 加载默认加密密钥（兼容旧接口）
-	encKeyB64 := config.GetString("kms.token.enc-key")
-	if encKeyB64 != "" {
-		keyBytes, err := base64.RawURLEncoding.DecodeString(encKeyB64)
-		if err != nil {
-			return nil, fmt.Errorf("decode encrypt key: %w", err)
-		}
-		key, err := jwk.ParseKey(keyBytes)
-		if err != nil {
-			return nil, fmt.Errorf("parse encrypt key: %w", err)
-		}
-		i.encryptKey = key
-		i.encryptor = NewJWEEncryptor(key)
-	}
-
-	return i, nil
-}
-
-// NewIssuerWithCrypto 创建带加密器和签名器的 Token 签发器
-func NewIssuerWithCrypto(issuerName string, encryptor Encryptor, signer Signer) *Issuer {
+func NewIssuer(issuerName string) *Issuer {
 	return &Issuer{
 		issuerName: issuerName,
-		encryptor:  encryptor,
-		signer:     signer,
+		store:      &KeyStore{},
 	}
 }
 
@@ -79,43 +64,22 @@ func (i *Issuer) GetIssuerName() string {
 	return i.issuerName
 }
 
-// SetEncryptor 设置加密器
-func (i *Issuer) SetEncryptor(encryptor Encryptor) {
-	i.encryptor = encryptor
+// SetSignKey 设置签名密钥
+func (i *Issuer) SetSignKey(key []byte) {
+	i.store.SetSignKey(key)
 }
 
-// SetSigner 设置签名器
-func (i *Issuer) SetSigner(signer Signer) {
-	i.signer = signer
-}
-
-// WithEncryptor 返回设置了加密器的新 Issuer（链式调用）
-func (i *Issuer) WithEncryptor(encryptor Encryptor) *Issuer {
-	return &Issuer{
-		issuerName: i.issuerName,
-		encryptor:  encryptor,
-		signer:     i.signer,
-		signingKey: i.signingKey,
-		encryptKey: i.encryptKey,
-	}
-}
-
-// WithSigner 返回设置了签名器的新 Issuer（链式调用）
-func (i *Issuer) WithSigner(signer Signer) *Issuer {
-	return &Issuer{
-		issuerName: i.issuerName,
-		encryptor:  i.encryptor,
-		signer:     signer,
-		signingKey: i.signingKey,
-		encryptKey: i.encryptKey,
-	}
+// SetEncryptKey 设置加密密钥
+func (i *Issuer) SetEncryptKey(key []byte) {
+	i.store.SetEncryptKey(key)
 }
 
 // Issue 签发 token
-// 使用 AccessToken 接口构建 token，通过成员变量 encryptor 加密用户信息，通过 signer 签名
 func (i *Issuer) Issue(accessToken AccessToken) (string, error) {
-	if i.signer == nil {
-		return "", errors.New("signer not set")
+	// 获取签名密钥
+	signKey, err := i.store.GetSignKey()
+	if err != nil {
+		return "", fmt.Errorf("get sign key: %w", err)
 	}
 
 	// 构建 JWT Token
@@ -126,10 +90,11 @@ func (i *Issuer) Issue(accessToken AccessToken) (string, error) {
 
 	// 如果是 UserAccessToken，需要加密用户信息到 sub
 	if uat, ok := accessToken.(*UserAccessToken); ok && uat.GetUser() != nil {
-		if i.encryptor == nil {
-			return "", errors.New("encryptor not set for UserAccessToken")
+		encryptKey, err := i.store.GetEncryptKey()
+		if err != nil {
+			return "", fmt.Errorf("get encrypt key: %w", err)
 		}
-		encryptedSub, err := i.encryptor.EncryptClaims(uat.GetUser())
+		encryptedSub, err := i.encryptClaims(uat.GetUser(), encryptKey)
 		if err != nil {
 			return "", fmt.Errorf("encrypt user claims: %w", err)
 		}
@@ -137,7 +102,7 @@ func (i *Issuer) Issue(accessToken AccessToken) (string, error) {
 	}
 
 	// 签名
-	signed, err := i.signer.Sign(token)
+	signed, err := jwt.Sign(token, jwt.WithKey(jwa.EdDSA(), signKey))
 	if err != nil {
 		return "", fmt.Errorf("sign token: %w", err)
 	}
@@ -145,7 +110,7 @@ func (i *Issuer) Issue(accessToken AccessToken) (string, error) {
 	return string(signed), nil
 }
 
-// IssueUserToken 签发用户访问令牌的便捷方法
+// IssueUserToken 签发用户访问令牌
 func (i *Issuer) IssueUserToken(
 	clientID, audience, scope string,
 	ttl time.Duration,
@@ -155,51 +120,71 @@ func (i *Issuer) IssueUserToken(
 	return i.Issue(uat)
 }
 
-// IssueServiceToken 签发服务访问令牌的便捷方法
+// IssueServiceToken 签发服务访问令牌
 func (i *Issuer) IssueServiceToken(
 	clientID, audience, scope string,
 	ttl time.Duration,
 ) (string, error) {
 	sat := NewServiceAccessToken(i.issuerName, clientID, audience, scope, ttl)
-	// ServiceAccessToken 不需要加密，临时使用 NopEncryptor
-	originalEncryptor := i.encryptor
-	i.encryptor = NewNopEncryptor()
-	defer func() { i.encryptor = originalEncryptor }()
 	return i.Issue(sat)
 }
 
-// ========== 向后兼容的方法 ==========
-
-// IssueWithDefaults 使用默认密钥签发 token（旧版兼容）
-// Deprecated: 使用 Issue 替代
-func (i *Issuer) IssueWithDefaults(claims *SubjectClaims, clientID string, scope string, ttl time.Duration) (string, error) {
-	user := &pkgtoken.Claims{
-		OpenID:   claims.OpenID,
-		Nickname: claims.Nickname,
-		Picture:  claims.Picture,
-		Email:    claims.Email,
-		Phone:    claims.Phone,
+// encryptClaims 加密用户信息
+func (i *Issuer) encryptClaims(claims *pkgtoken.Claims, encryptKey jwk.Key) (string, error) {
+	data, err := json.Marshal(claims)
+	if err != nil {
+		return "", fmt.Errorf("marshal claims: %w", err)
 	}
 
-	// 使用默认的 encryptor 和 signer
-	originalEncryptor := i.encryptor
-	originalSigner := i.signer
-	i.encryptor = NewJWEEncryptor(i.encryptKey)
-	i.signer = NewEdDSASigner(i.signingKey)
-	defer func() {
-		i.encryptor = originalEncryptor
-		i.signer = originalSigner
-	}()
+	if encryptKey == nil {
+		return string(data), nil
+	}
 
-	uat := NewUserAccessToken(i.issuerName, clientID, clientID, scope, ttl, user)
-	return i.Issue(uat)
+	encrypted, err := jwe.Encrypt(data,
+		jwe.WithKey(jwa.DIRECT(), encryptKey),
+		jwe.WithContentEncryption(jwa.A256GCM()),
+	)
+	if err != nil {
+		return "", fmt.Errorf("jwe encrypt: %w", err)
+	}
+
+	return string(encrypted), nil
 }
 
-// VerifyAccessToken 验证 Access Token，返回完整身份信息（旧版兼容）
+// decryptClaims 解密用户信息
+func (i *Issuer) decryptClaims(encryptedSub string, decryptKey jwk.Key) (*pkgtoken.Claims, error) {
+	var data []byte
+
+	if decryptKey == nil {
+		data = []byte(encryptedSub)
+	} else {
+		decrypted, err := jwe.Decrypt([]byte(encryptedSub),
+			jwe.WithKey(jwa.DIRECT(), decryptKey),
+		)
+		if err != nil {
+			return nil, err
+		}
+		data = decrypted
+	}
+
+	var claims pkgtoken.Claims
+	if err := json.Unmarshal(data, &claims); err != nil {
+		return nil, err
+	}
+
+	return &claims, nil
+}
+
+// VerifyAccessToken 验证 Access Token，返回身份信息
 func (i *Issuer) VerifyAccessToken(tokenString string) (*Identity, error) {
+	signKey, err := i.store.GetSignKey()
+	if err != nil {
+		return nil, fmt.Errorf("get sign key: %w", err)
+	}
+
 	// 验证签名
 	token, err := jwt.Parse([]byte(tokenString),
-		jwt.WithKey(jwa.EdDSA(), i.signingKey),
+		jwt.WithKey(jwa.EdDSA(), signKey),
 		jwt.WithValidate(true),
 	)
 	if err != nil {
@@ -213,7 +198,12 @@ func (i *Issuer) VerifyAccessToken(tokenString string) (*Identity, error) {
 	}
 
 	// 解密 sub
-	claims, err := i.decryptSubjectClaims(encryptedSub, i.encryptKey)
+	encryptKey, err := i.store.GetEncryptKey()
+	if err != nil {
+		return nil, fmt.Errorf("get encrypt key: %w", err)
+	}
+
+	claims, err := i.decryptClaims(encryptedSub, encryptKey)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt sub: %w", err)
 	}
@@ -258,7 +248,6 @@ func (i *Issuer) ParseAccessTokenUnverified(tokenString string) (aud string, iss
 
 // VerifyServiceJWT 验证 Service JWT（用于 introspect）
 func (i *Issuer) VerifyServiceJWT(tokenString string, serviceKey []byte) (serviceID string, jti string, err error) {
-	// 使用 HMAC 验证
 	key, err := jwk.Import(serviceKey)
 	if err != nil {
 		return "", "", fmt.Errorf("import service key: %w", err)
@@ -282,36 +271,9 @@ func (i *Issuer) VerifyServiceJWT(tokenString string, serviceKey []byte) (servic
 	return sub, jtiVal, nil
 }
 
-// decryptSubjectClaims 解密用户信息
-func (i *Issuer) decryptSubjectClaims(encryptedSub string, decryptKey jwk.Key) (*SubjectClaims, error) {
-	var data []byte
-
-	if decryptKey == nil {
-		// 没有解密密钥则直接解析 JSON
-		data = []byte(encryptedSub)
-	} else {
-		decrypted, err := jwe.Decrypt([]byte(encryptedSub),
-			jwe.WithKey(jwa.DIRECT(), decryptKey),
-		)
-		if err != nil {
-			return nil, err
-		}
-		data = decrypted
-	}
-
-	var claims SubjectClaims
-	if err := json.Unmarshal(data, &claims); err != nil {
-		return nil, err
-	}
-
-	return &claims, nil
-}
-
 // VerifyAccessTokenGlobal 兼容旧接口（全局函数）
+// Deprecated: 使用 Issuer.VerifyAccessToken 替代
 func VerifyAccessTokenGlobal(tokenString string) (*Identity, error) {
-	issuer, err := NewIssuer()
-	if err != nil {
-		return nil, err
-	}
-	return issuer.VerifyAccessToken(tokenString)
+	// 此函数已废弃，需要使用带密钥的 Issuer
+	return nil, errors.New("VerifyAccessTokenGlobal is deprecated, use Issuer.VerifyAccessToken instead")
 }

@@ -32,10 +32,8 @@ type Service struct {
 
 // NewService 创建认证服务
 func NewService(db *gorm.DB, hermesSvc *hermes.Service) (*Service, error) {
-	issuer, err := token.NewIssuer()
-	if err != nil {
-		return nil, fmt.Errorf("create token issuer: %w", err)
-	}
+	issuerName := config.GetString("auth.issuer")
+	issuer := token.NewIssuer(issuerName)
 
 	return &Service{
 		db:          db,
@@ -768,19 +766,9 @@ func (s *Service) generateTokens(ctx context.Context, client *Client, user *User
 		return nil, fmt.Errorf("get domain: %w", err)
 	}
 
-	// 设置加密器（使用服务密钥加密用户信息）
-	encryptor, err := token.NewJWEEncryptorFromBytes(svcWithKey.Key)
-	if err != nil {
-		return nil, fmt.Errorf("create encryptor: %w", err)
-	}
-	s.issuer.SetEncryptor(encryptor)
-
-	// 设置签名器（使用域签名密钥）
-	signer, err := token.NewEdDSASignerFromBytes(domainWithKey.SignKey)
-	if err != nil {
-		return nil, fmt.Errorf("create signer: %w", err)
-	}
-	s.issuer.SetSigner(signer)
+	// 设置密钥
+	s.issuer.SetEncryptKey(svcWithKey.Key)
+	s.issuer.SetSignKey(domainWithKey.SignKey)
 
 	// 3. 计算 TTL（优先使用服务配置，其次使用客户端配置，最后使用全局配置）
 	accessTTL := time.Duration(svcWithKey.AccessTokenExpiresIn) * time.Second
