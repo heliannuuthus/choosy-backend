@@ -52,14 +52,14 @@ func (s *Service) Authorize(ctx context.Context, req *AuthorizeRequest) (string,
 		return "", NewError(ErrUnsupportedResponseType, "response_type must be 'code'")
 	}
 
-	// 2. 验证客户端
-	client, err := s.getClient(req.ClientID)
+	// 2. 验证应用
+	app, err := s.hermesCache.GetApplication(ctx, req.ClientID)
 	if err != nil {
-		return "", NewError(ErrInvalidClient, "client not found")
+		return "", NewError(ErrInvalidClient, "application not found")
 	}
 
 	// 3. 验证重定向 URI
-	if !client.ValidateRedirectURI(req.RedirectURI) {
+	if !app.ValidateRedirectURI(req.RedirectURI) {
 		return "", NewError(ErrInvalidRequest, "invalid redirect_uri")
 	}
 
@@ -98,21 +98,21 @@ func (s *Service) Authorize(ctx context.Context, req *AuthorizeRequest) (string,
 
 // GetIDPConfigs 获取客户端允许的 IDPs 配置（从配置文件读取）
 func (s *Service) GetIDPConfigs(clientID string) (*IDPsResponse, error) {
-	// 1. 验证客户端
-	client, err := s.getClient(clientID)
+	// 1. 验证应用
+	app, err := s.hermesCache.GetApplication(context.Background(), clientID)
 	if err != nil {
-		return nil, NewError(ErrInvalidClient, "client not found")
+		return nil, NewError(ErrInvalidClient, "application not found")
 	}
 
 	// 2. 根据域返回该域下所有支持的 IDPs
 	var idps []IDP
-	switch client.Domain {
+	switch Domain(app.DomainID) {
 	case DomainCIAM:
 		idps = []IDP{IDPWechatMP, IDPTTMP, IDPAlipayMP}
 	case DomainPIAM:
 		idps = []IDP{IDPWecom, IDPGithub, IDPGoogle}
 	default:
-		return nil, fmt.Errorf("unknown domain: %s", client.Domain)
+		return nil, fmt.Errorf("unknown domain: %s", app.DomainID)
 	}
 
 	// 3. 构建配置列表
@@ -205,14 +205,15 @@ func (s *Service) Login(ctx context.Context, sessionID string, req *LoginRequest
 		return nil, NewError(ErrInvalidRequest, "connection is required")
 	}
 
-	// 3. 获取客户端并验证 IDP
-	client, err := s.getClient(session.ClientID)
+	// 3. 获取应用并验证 IDP
+	app, err := s.hermesCache.GetApplication(ctx, session.ClientID)
 	if err != nil {
-		return nil, NewError(ErrInvalidClient, "client not found")
+		return nil, NewError(ErrInvalidClient, "application not found")
 	}
 
-	if !client.ValidateIDP(idp) {
-		return nil, NewError(ErrInvalidRequest, fmt.Sprintf("idp %s not allowed for this client", idp))
+	// 验证 IDP 所属域与应用域匹配
+	if idp.GetDomain() != Domain(app.DomainID) {
+		return nil, NewError(ErrInvalidRequest, fmt.Sprintf("idp %s not allowed for this application", idp))
 	}
 
 	// 4. 检查前置认证需求（如人机验证）
@@ -414,13 +415,13 @@ func (s *Service) exchangeAuthorizationCode(ctx context.Context, req *TokenReque
 		return nil, NewError(ErrServerError, "user not found")
 	}
 
-	client, err := s.getClient(authCode.ClientID)
+	app, err := s.hermesCache.GetApplication(ctx, authCode.ClientID)
 	if err != nil {
-		return nil, NewError(ErrInvalidClient, "client not found")
+		return nil, NewError(ErrInvalidClient, "application not found")
 	}
 
 	// 7. 生成 Token（使用授权码中的 scope 和 audience）
-	return s.generateTokens(ctx, client, user, authCode.Audience, authCode.Scope)
+	return s.generateTokens(ctx, app, user, authCode.Audience, authCode.Scope)
 }
 
 func (s *Service) exchangeRefreshToken(ctx context.Context, req *TokenRequest) (*TokenResponse, error) {
@@ -446,21 +447,21 @@ func (s *Service) exchangeRefreshToken(ctx context.Context, req *TokenRequest) (
 		return nil, NewError(ErrServerError, "user not found")
 	}
 
-	client, err := s.getClient(refreshToken.ClientID)
+	app, err := s.hermesCache.GetApplication(ctx, refreshToken.ClientID)
 	if err != nil {
-		return nil, NewError(ErrInvalidClient, "client not found")
+		return nil, NewError(ErrInvalidClient, "application not found")
 	}
 
 	// 5. 生成新的 Access Token（使用 refresh token 中的 scope 和 audience）
-	token, err := s.generateTokens(ctx, client, user, refreshToken.Audience, refreshToken.Scope)
+	tokenResp, err := s.generateTokens(ctx, app, user, refreshToken.Audience, refreshToken.Scope)
 	if err != nil {
 		return nil, err
 	}
 
 	// 保持 refresh token 不变（不轮转）
-	token.RefreshToken = refreshToken.Token
+	tokenResp.RefreshToken = refreshToken.Token
 
-	return token, nil
+	return tokenResp, nil
 }
 
 // ============= Revoke =============
@@ -551,14 +552,6 @@ func (s *Service) UpdateUserInfo(identity *Identity, req *UpdateUserInfoRequest)
 
 // ============= Helper Methods =============
 
-func (s *Service) getClient(clientID string) (*Client, error) {
-	var client Client
-	if err := s.db.Where("client_id = ?", clientID).First(&client).Error; err != nil {
-		return nil, err
-	}
-	return &client, nil
-}
-
 func (s *Service) getUserByOpenID(openid string) (*User, error) {
 	var user User
 	if err := s.db.Where("openid = ?", openid).First(&user).Error; err != nil {
@@ -631,16 +624,16 @@ func (s *Service) findOrCreateUser(idp IDP, result *IDPResult) (*User, error) {
 	return &user, nil
 }
 
-func (s *Service) generateTokens(ctx context.Context, client *Client, user *User, audience string, scope string) (*TokenResponse, error) {
+func (s *Service) generateTokens(ctx context.Context, app *cache.Application, user *User, audience string, scope string) (*TokenResponse, error) {
 	now := time.Now()
 
 	// 1. 验证 Application-Service 关系
-	hasRelation, err := s.hermesCache.CheckApplicationServiceRelation(ctx, client.ClientID, audience)
+	hasRelation, err := s.hermesCache.CheckApplicationServiceRelation(ctx, app.AppID, audience)
 	if err != nil {
 		return nil, fmt.Errorf("check application service relation: %w", err)
 	}
 	if !hasRelation {
-		return nil, NewError(ErrAccessDenied, fmt.Sprintf("application %s has no access to service %s", client.ClientID, audience))
+		return nil, NewError(ErrAccessDenied, fmt.Sprintf("application %s has no access to service %s", app.AppID, audience))
 	}
 
 	// 2. 获取 Service 配置（用于 TTL）
@@ -649,19 +642,13 @@ func (s *Service) generateTokens(ctx context.Context, client *Client, user *User
 		return nil, fmt.Errorf("get service: %w", err)
 	}
 
-	// 3. 计算 TTL（优先使用服务配置，其次使用客户端配置，最后使用全局配置）
+	// 3. 计算 TTL（优先使用服务配置，最后使用全局配置）
 	accessTTL := time.Duration(svc.AccessTokenExpiresIn) * time.Second
-	if accessTTL == 0 {
-		accessTTL = time.Duration(client.AccessTokenExpiresIn) * time.Second
-	}
 	if accessTTL == 0 {
 		accessTTL = time.Duration(config.GetInt("auth.expires-in")) * time.Second
 	}
 
 	refreshTTL := time.Duration(svc.RefreshTokenExpiresIn) * time.Second
-	if refreshTTL == 0 {
-		refreshTTL = time.Duration(client.RefreshTokenExpiresIn) * time.Second
-	}
 	if refreshTTL == 0 {
 		refreshTTL = time.Duration(config.GetInt("auth.refresh-expires-in")) * 24 * time.Hour
 	}
@@ -695,7 +682,7 @@ func (s *Service) generateTokens(ctx context.Context, client *Client, user *User
 	// 5. 创建 Access Token
 	uat := token.NewUserAccessToken(
 		s.tokenSvc.GetIssuerName(),
-		client.ClientID,
+		app.AppID,
 		audience,
 		scope,
 		accessTTL,
@@ -716,14 +703,14 @@ func (s *Service) generateTokens(ctx context.Context, client *Client, user *User
 	// 6. 只有 scope 包含 offline_access 时才返回 refresh_token
 	if ContainsScope(scopes, ScopeOfflineAccess) {
 		// 清理旧的 Refresh Token
-		s.cleanupOldRefreshTokens(ctx, user.OpenID, client.ClientID)
+		s.cleanupOldRefreshTokens(ctx, user.OpenID, app.AppID)
 
 		// 创建新的 Refresh Token
 		refreshToken := &RefreshToken{
 			Token:     GenerateRefreshTokenValue(),
 			UserID:    user.OpenID,
-			ClientID:  client.ClientID,
-			Audience:  audience, // 新增
+			ClientID:  app.AppID,
+			Audience:  audience,
 			Scope:     scope,
 			ExpiresAt: now.Add(refreshTTL),
 			CreatedAt: now,
