@@ -17,7 +17,6 @@ import (
 	"github.com/heliannuuthus/helios/pkg/kms"
 	"github.com/heliannuuthus/helios/pkg/logger"
 	"github.com/lestrrat-go/jwx/v3/jwk"
-	"github.com/lestrrat-go/jwx/v3/jwt"
 	"gorm.io/gorm"
 )
 
@@ -26,7 +25,6 @@ type Service struct {
 	db          *gorm.DB
 	store       Store
 	issuer      *token.Issuer
-	verifier    *token.Verifier
 	idpManager  *IDPManager
 	hermesCache *cache.HermesCache
 }
@@ -35,13 +33,11 @@ type Service struct {
 func NewService(db *gorm.DB, hermesSvc *hermes.Service) (*Service, error) {
 	hermesCache := cache.NewHermesCache(hermesSvc)
 	issuer := token.NewIssuer(hermesCache)
-	verifier := token.NewVerifier(hermesCache)
 
 	return &Service{
 		db:          db,
 		store:       NewMemoryStore(), // TODO: 支持 Redis
 		issuer:      issuer,
-		verifier:    verifier,
 		idpManager:  NewIDPManager(),
 		hermesCache: hermesCache,
 	}, nil
@@ -482,111 +478,43 @@ func (s *Service) RevokeAllTokens(ctx context.Context, userID string) error {
 // ============= Introspect =============
 
 // Introspect Token 内省
+// Service 调用此接口查询 token 信息，auth 服务只解析不验证
+// UAT/SAT 的验证由 Service 自己使用 pkg/token/Interpreter 完成
 func (s *Service) Introspect(ctx context.Context, tokenString string, serviceJWT string) (*IntrospectResponse, error) {
-	// 1. 验证 Service JWT
-	serviceID, _, err := s.verifyServiceJWT(serviceJWT)
+	// 1. 验证 Service JWT（验证调用者身份）
+	serviceClaims, err := s.issuer.VerifyServiceJWT(ctx, serviceJWT)
 	if err != nil {
 		return nil, NewError(ErrInvalidClient, fmt.Sprintf("invalid service jwt: %v", err))
 	}
 
 	// 2. 检查 jti 防重放（TODO: 实现 Redis 存储）
-	// 这里先跳过，后续实现
-	_ = serviceID // 暂时未使用，后续可用于日志
+	_ = serviceClaims.JTI
 
-	// 3. 解析 Access Token（不验证，因为可能已过期）
-	aud, iss, exp, iat, scope, err := s.verifier.ParseAccessTokenUnverified(tokenString)
+	// 3. 解析 Access Token（不验证，Service 自己会验证）
+	tokenInfo, err := s.issuer.ParseAccessTokenUnverified(tokenString)
 	if err != nil {
 		return &IntrospectResponse{Active: false}, nil
 	}
 
-	// 4. 验证 Token 签名和有效性
-	identity, err := s.verifier.VerifyAccessToken(ctx, tokenString)
-	if err != nil {
+	// 4. 检查 token 是否过期
+	if tokenInfo.Exp < time.Now().Unix() {
 		return &IntrospectResponse{Active: false}, nil
 	}
 
-	// 5. 获取用户完整信息
-	user, err := s.getUserByOpenID(identity.OpenID)
-	if err != nil {
-		return &IntrospectResponse{Active: false}, nil
-	}
-
-	// 6. 解密手机号（如果有）
-	var phone string
-	if user.PhoneCipher != nil {
-		decryptedPhone, err := kms.DecryptPhone(*user.PhoneCipher, user.OpenID)
-		if err == nil {
-			phone = decryptedPhone
-		}
-	}
-
-	// 7. 构建响应（完整信息，未脱敏）
+	// 5. 构建响应
 	resp := &IntrospectResponse{
-		Active:   true,
-		Sub:      identity.OpenID,
-		Aud:      aud,
-		Iss:      iss,
-		Exp:      exp,
-		Iat:      iat,
-		Scope:    scope,
-		Nickname: identity.Nickname,
-		Picture:  identity.Picture,
-		Email:    identity.Email,
-		Phone:    phone,
+		Active: true,
+		Sub:    tokenInfo.Sub, // 加密的用户信息或空
+		Aud:    tokenInfo.Audience,
+		Iss:    tokenInfo.Issuer,
+		Exp:    tokenInfo.Exp,
+		Iat:    tokenInfo.Iat,
+		Scope:  tokenInfo.Scope,
 	}
 
-	// 如果 Token 中没有，从数据库补充
-	if resp.Nickname == "" {
-		resp.Nickname = user.Name
-	}
-	if resp.Picture == "" {
-		resp.Picture = user.Picture
-	}
-	if resp.Email == "" && user.Email != nil {
-		resp.Email = *user.Email
-	}
-	if resp.Phone == "" && phone != "" {
-		resp.Phone = phone
-	}
-
-	logger.Infof("[Auth] Token 内省成功 - ServiceID: %s, UserID: %s", serviceID, identity.OpenID)
+	logger.Infof("[Auth] Token 内省成功 - ServiceID: %s, Audience: %s", serviceClaims.ClientID, tokenInfo.Audience)
 
 	return resp, nil
-}
-
-// verifyServiceJWT 验证 Service JWT
-func (s *Service) verifyServiceJWT(tokenString string) (serviceID string, jti string, err error) {
-	// 解析 JWT 获取 service_id（不验证签名）
-	token, parseErr := jwt.Parse([]byte(tokenString), jwt.WithVerify(false))
-	if parseErr != nil {
-		return "", "", parseErr
-	}
-
-	sub, ok := token.Subject()
-	if !ok {
-		return "", "", errors.New("missing sub in service jwt")
-	}
-
-	jtiVal, _ := token.JwtID()
-
-	// 从缓存获取带解密密钥的 Service
-	svc, err := s.hermesCache.GetService(context.Background(), sub)
-	if err != nil {
-		return "", "", fmt.Errorf("service not found: %w", err)
-	}
-
-	// 验证 JWT 签名
-	verifiedServiceID, verifiedJti, verifyErr := s.verifier.VerifyServiceJWT(tokenString, svc.Key)
-	if verifyErr != nil {
-		return "", "", fmt.Errorf("verify service jwt: %w", verifyErr)
-	}
-
-	// 返回验证后的 serviceID 和 jti（如果 jtiVal 为空则使用 verifiedJti）
-	if jtiVal == "" {
-		jtiVal = verifiedJti
-	}
-
-	return verifiedServiceID, jtiVal, nil
 }
 
 // ============= UserInfo =============

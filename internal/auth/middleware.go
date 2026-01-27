@@ -9,31 +9,31 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Middleware 认证中间件
+// Middleware 认证中间件（用于验证 CAT/ServiceJWT）
 type Middleware struct {
-	verifier *token.Verifier
+	issuer *token.Issuer
 }
 
 // NewMiddleware 创建中间件
-func NewMiddleware(verifier *token.Verifier) *Middleware {
-	return &Middleware{verifier: verifier}
+func NewMiddleware(issuer *token.Issuer) *Middleware {
+	return &Middleware{issuer: issuer}
 }
 
-// RequireAuth 要求认证
-func (m *Middleware) RequireAuth() gin.HandlerFunc {
+// RequireClientAuth 要求客户端认证（验证 CAT）
+func (m *Middleware) RequireClientAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := m.extractToken(c)
 		if tokenStr == "" {
 			c.Header("WWW-Authenticate", "Bearer")
 			c.AbortWithStatusJSON(http.StatusUnauthorized, Error{
 				Code:        ErrInvalidToken,
-				Description: "missing access token",
+				Description: "missing client access token",
 			})
 			return
 		}
 
-		// 验证 Access Token
-		identity, err := m.verifier.VerifyAccessToken(c.Request.Context(), tokenStr)
+		// 验证 ClientAccessToken
+		claims, err := m.issuer.VerifyClientAccessToken(c.Request.Context(), tokenStr)
 		if err != nil {
 			c.Header("WWW-Authenticate", "Bearer error=\"invalid_token\"")
 			c.AbortWithStatusJSON(http.StatusUnauthorized, Error{
@@ -43,45 +43,36 @@ func (m *Middleware) RequireAuth() gin.HandlerFunc {
 			return
 		}
 
-		c.Set("identity", identity)
+		c.Set("client_claims", claims)
 		c.Next()
 	}
 }
 
-// OptionalAuth 可选认证
-func (m *Middleware) OptionalAuth() gin.HandlerFunc {
+// RequireServiceAuth 要求服务认证（验证 ServiceJWT）
+func (m *Middleware) RequireServiceAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := m.extractToken(c)
 		if tokenStr == "" {
-			c.Next()
-			return
-		}
-
-		// 验证 Access Token
-		identity, err := m.verifier.VerifyAccessToken(c.Request.Context(), tokenStr)
-		if err == nil && identity != nil {
-			c.Set("identity", identity)
-		}
-
-		c.Next()
-	}
-}
-
-// RequireDomain 要求特定域
-func (m *Middleware) RequireDomain(domain Domain) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		identity := GetIdentity(c)
-		if identity == nil {
+			c.Header("WWW-Authenticate", "Bearer")
 			c.AbortWithStatusJSON(http.StatusUnauthorized, Error{
 				Code:        ErrInvalidToken,
-				Description: "authentication required",
+				Description: "missing service jwt",
 			})
 			return
 		}
 
-		// Domain 检查已移除（不再在 Token 中存储 domain）
-		// 如果需要域检查，可以通过其他方式实现
+		// 验证 ServiceJWT
+		claims, err := m.issuer.VerifyServiceJWT(c.Request.Context(), tokenStr)
+		if err != nil {
+			c.Header("WWW-Authenticate", "Bearer error=\"invalid_token\"")
+			c.AbortWithStatusJSON(http.StatusUnauthorized, Error{
+				Code:        ErrInvalidToken,
+				Description: err.Error(),
+			})
+			return
+		}
 
+		c.Set("service_claims", claims)
 		c.Next()
 	}
 }
@@ -95,7 +86,26 @@ func (m *Middleware) extractToken(c *gin.Context) string {
 	return ""
 }
 
-// GetIdentity 从上下文获取用户身份
+// GetClientClaims 从上下文获取客户端信息
+func GetClientClaims(c *gin.Context) *token.ClientAccessTokenClaims {
+	if claims, exists := c.Get("client_claims"); exists {
+		return claims.(*token.ClientAccessTokenClaims)
+	}
+	return nil
+}
+
+// GetServiceClaims 从上下文获取服务信息
+func GetServiceClaims(c *gin.Context) *token.ClientAccessTokenClaims {
+	if claims, exists := c.Get("service_claims"); exists {
+		return claims.(*token.ClientAccessTokenClaims)
+	}
+	return nil
+}
+
+// ============= 以下是兼容旧接口的代码，已废弃 =============
+
+// GetIdentity 从上下文获取用户身份（兼容旧接口）
+// Deprecated: auth 模块不再验证 UAT/SAT，请使用 pkg/token/Interpreter
 func GetIdentity(c *gin.Context) *token.Identity {
 	if identity, exists := c.Get("identity"); exists {
 		return identity.(*token.Identity)
@@ -103,7 +113,8 @@ func GetIdentity(c *gin.Context) *token.Identity {
 	return nil
 }
 
-// GetUserID 从上下文获取用户 ID
+// GetUserID 从上下文获取用户 ID（兼容旧接口）
+// Deprecated: auth 模块不再验证 UAT/SAT
 func GetUserID(c *gin.Context) string {
 	if identity := GetIdentity(c); identity != nil {
 		return identity.OpenID
@@ -111,9 +122,8 @@ func GetUserID(c *gin.Context) string {
 	return ""
 }
 
-// GetDomain 从上下文获取域（已废弃，Token 中不再存储 domain）
+// GetDomain 从上下文获取域（兼容旧接口）
+// Deprecated: Domain 信息已从 Token 中移除
 func GetDomain(c *gin.Context) Domain {
-	// Domain 信息已从 Token 中移除
-	// 如需获取用户域，请从数据库查询
 	return ""
 }

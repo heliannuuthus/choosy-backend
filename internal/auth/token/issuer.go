@@ -228,3 +228,98 @@ func (i *Issuer) VerifyClientAccessToken(ctx context.Context, tokenString string
 		JTI:      jti,
 	}, nil
 }
+
+// VerifyServiceJWT 验证 Service JWT（用于 introspect）
+// Service JWT 本质上也是 CAT 的一种形式，由 Service 使用其密钥签发
+func (i *Issuer) VerifyServiceJWT(ctx context.Context, tokenString string) (*ClientAccessTokenClaims, error) {
+	// 1. 解析 JWT 获取 service_id（不验证签名）
+	unverified, err := jwt.Parse([]byte(tokenString), jwt.WithVerify(false))
+	if err != nil {
+		return nil, fmt.Errorf("parse token: %w", err)
+	}
+
+	serviceID, ok := unverified.Subject()
+	if !ok || serviceID == "" {
+		return nil, errors.New("missing sub (service_id)")
+	}
+
+	// 2. 从缓存获取 Service 密钥
+	svc, err := i.cache.GetService(ctx, serviceID)
+	if err != nil {
+		return nil, fmt.Errorf("get service: %w", err)
+	}
+
+	// 3. 导入密钥
+	key, err := jwk.Import(svc.Key)
+	if err != nil {
+		return nil, fmt.Errorf("import service key: %w", err)
+	}
+
+	// 4. 验证签名（Service JWT 使用 HS256）
+	token, err := jwt.Parse([]byte(tokenString),
+		jwt.WithKey(jwa.HS256(), key),
+		jwt.WithValidate(true),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("verify token: %w", err)
+	}
+
+	// 5. 提取信息
+	audVal, ok := token.Audience()
+	var audience string
+	if ok && len(audVal) > 0 {
+		audience = audVal[0]
+	}
+
+	jti, _ := token.JwtID()
+
+	return &ClientAccessTokenClaims{
+		ClientID: serviceID, // Service ID 放在 ClientID 字段
+		Audience: audience,
+		JTI:      jti,
+	}, nil
+}
+
+// ParseAccessTokenUnverified 解析 Access Token（不验证）
+// 用于 introspect 场景：auth 服务只需解析 token 信息，不需要验证
+func (i *Issuer) ParseAccessTokenUnverified(tokenString string) (*AccessTokenInfo, error) {
+	token, err := jwt.Parse([]byte(tokenString), jwt.WithVerify(false))
+	if err != nil {
+		return nil, fmt.Errorf("parse token: %w", err)
+	}
+
+	info := &AccessTokenInfo{}
+
+	if audVal, ok := token.Audience(); ok && len(audVal) > 0 {
+		info.Audience = audVal[0]
+	}
+	if issVal, ok := token.Issuer(); ok {
+		info.Issuer = issVal
+	}
+	if expVal, ok := token.Expiration(); ok {
+		info.Exp = expVal.Unix()
+	}
+	if iatVal, ok := token.IssuedAt(); ok {
+		info.Iat = iatVal.Unix()
+	}
+	_ = token.Get("scope", &info.Scope)
+	_ = token.Get("cli", &info.ClientID)
+
+	// 获取 sub（可能是加密的用户信息，也可能不存在）
+	if sub, ok := token.Subject(); ok {
+		info.Sub = sub
+	}
+
+	return info, nil
+}
+
+// AccessTokenInfo 解析 AccessToken 后的信息（不含验证）
+type AccessTokenInfo struct {
+	Issuer   string
+	Audience string
+	ClientID string
+	Scope    string
+	Sub      string // 可能是加密的用户信息
+	Exp      int64
+	Iat      int64
+}
