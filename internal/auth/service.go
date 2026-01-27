@@ -768,17 +768,19 @@ func (s *Service) generateTokens(ctx context.Context, client *Client, user *User
 		return nil, fmt.Errorf("get domain: %w", err)
 	}
 
-	// 创建加密器（使用服务密钥加密用户信息）
+	// 设置加密器（使用服务密钥加密用户信息）
 	encryptor, err := token.NewJWEEncryptorFromBytes(svcWithKey.Key)
 	if err != nil {
 		return nil, fmt.Errorf("create encryptor: %w", err)
 	}
+	s.issuer.SetEncryptor(encryptor)
 
-	// 创建签名器（使用域签名密钥）
+	// 设置签名器（使用域签名密钥）
 	signer, err := token.NewEdDSASignerFromBytes(domainWithKey.SignKey)
 	if err != nil {
 		return nil, fmt.Errorf("create signer: %w", err)
 	}
+	s.issuer.SetSigner(signer)
 
 	// 3. 计算 TTL（优先使用服务配置，其次使用客户端配置，最后使用全局配置）
 	accessTTL := time.Duration(svcWithKey.AccessTokenExpiresIn) * time.Second
@@ -830,8 +832,6 @@ func (s *Service) generateTokens(ctx context.Context, client *Client, user *User
 		scope,
 		accessTTL,
 		userClaims,
-		encryptor,
-		signer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create token: %w", err)

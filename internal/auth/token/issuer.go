@@ -17,9 +17,13 @@ import (
 
 // Issuer Token 签发器
 type Issuer struct {
-	issuerName string  // issuer 字符串
-	signingKey jwk.Key // 默认签名密钥（用于旧接口兼容）
-	encryptKey jwk.Key // 默认加密密钥（用于旧接口兼容）
+	issuerName string    // issuer 字符串
+	encryptor  Encryptor // 加密器
+	signer     Signer    // 签名器
+
+	// 默认密钥（用于旧接口兼容）
+	signingKey jwk.Key
+	encryptKey jwk.Key
 }
 
 // NewIssuer 创建 Token 签发器
@@ -40,6 +44,7 @@ func NewIssuer() (*Issuer, error) {
 			return nil, fmt.Errorf("parse signing key: %w", err)
 		}
 		i.signingKey = key
+		i.signer = NewEdDSASigner(key)
 	}
 
 	// 加载默认加密密钥（兼容旧接口）
@@ -54,9 +59,19 @@ func NewIssuer() (*Issuer, error) {
 			return nil, fmt.Errorf("parse encrypt key: %w", err)
 		}
 		i.encryptKey = key
+		i.encryptor = NewJWEEncryptor(key)
 	}
 
 	return i, nil
+}
+
+// NewIssuerWithCrypto 创建带加密器和签名器的 Token 签发器
+func NewIssuerWithCrypto(issuerName string, encryptor Encryptor, signer Signer) *Issuer {
+	return &Issuer{
+		issuerName: issuerName,
+		encryptor:  encryptor,
+		signer:     signer,
+	}
 }
 
 // GetIssuerName 返回签发者名称
@@ -64,9 +79,45 @@ func (i *Issuer) GetIssuerName() string {
 	return i.issuerName
 }
 
-// Issue 签发 token（新版本）
-// 使用 AccessToken 接口构建 token，通过 Encryptor 加密用户信息，通过 Signer 签名
-func (i *Issuer) Issue(accessToken AccessToken, encryptor Encryptor, signer Signer) (string, error) {
+// SetEncryptor 设置加密器
+func (i *Issuer) SetEncryptor(encryptor Encryptor) {
+	i.encryptor = encryptor
+}
+
+// SetSigner 设置签名器
+func (i *Issuer) SetSigner(signer Signer) {
+	i.signer = signer
+}
+
+// WithEncryptor 返回设置了加密器的新 Issuer（链式调用）
+func (i *Issuer) WithEncryptor(encryptor Encryptor) *Issuer {
+	return &Issuer{
+		issuerName: i.issuerName,
+		encryptor:  encryptor,
+		signer:     i.signer,
+		signingKey: i.signingKey,
+		encryptKey: i.encryptKey,
+	}
+}
+
+// WithSigner 返回设置了签名器的新 Issuer（链式调用）
+func (i *Issuer) WithSigner(signer Signer) *Issuer {
+	return &Issuer{
+		issuerName: i.issuerName,
+		encryptor:  i.encryptor,
+		signer:     signer,
+		signingKey: i.signingKey,
+		encryptKey: i.encryptKey,
+	}
+}
+
+// Issue 签发 token
+// 使用 AccessToken 接口构建 token，通过成员变量 encryptor 加密用户信息，通过 signer 签名
+func (i *Issuer) Issue(accessToken AccessToken) (string, error) {
+	if i.signer == nil {
+		return "", errors.New("signer not set")
+	}
+
 	// 构建 JWT Token
 	token, err := accessToken.Build()
 	if err != nil {
@@ -75,7 +126,10 @@ func (i *Issuer) Issue(accessToken AccessToken, encryptor Encryptor, signer Sign
 
 	// 如果是 UserAccessToken，需要加密用户信息到 sub
 	if uat, ok := accessToken.(*UserAccessToken); ok && uat.GetUser() != nil {
-		encryptedSub, err := encryptor.EncryptClaims(uat.GetUser())
+		if i.encryptor == nil {
+			return "", errors.New("encryptor not set for UserAccessToken")
+		}
+		encryptedSub, err := i.encryptor.EncryptClaims(uat.GetUser())
 		if err != nil {
 			return "", fmt.Errorf("encrypt user claims: %w", err)
 		}
@@ -83,7 +137,7 @@ func (i *Issuer) Issue(accessToken AccessToken, encryptor Encryptor, signer Sign
 	}
 
 	// 签名
-	signed, err := signer.Sign(token)
+	signed, err := i.signer.Sign(token)
 	if err != nil {
 		return "", fmt.Errorf("sign token: %w", err)
 	}
@@ -96,22 +150,22 @@ func (i *Issuer) IssueUserToken(
 	clientID, audience, scope string,
 	ttl time.Duration,
 	user *pkgtoken.Claims,
-	encryptor Encryptor,
-	signer Signer,
 ) (string, error) {
 	uat := NewUserAccessToken(i.issuerName, clientID, audience, scope, ttl, user)
-	return i.Issue(uat, encryptor, signer)
+	return i.Issue(uat)
 }
 
 // IssueServiceToken 签发服务访问令牌的便捷方法
 func (i *Issuer) IssueServiceToken(
 	clientID, audience, scope string,
 	ttl time.Duration,
-	signer Signer,
 ) (string, error) {
 	sat := NewServiceAccessToken(i.issuerName, clientID, audience, scope, ttl)
-	// ServiceAccessToken 不需要加密
-	return i.Issue(sat, NewNopEncryptor(), signer)
+	// ServiceAccessToken 不需要加密，临时使用 NopEncryptor
+	originalEncryptor := i.encryptor
+	i.encryptor = NewNopEncryptor()
+	defer func() { i.encryptor = originalEncryptor }()
+	return i.Issue(sat)
 }
 
 // ========== 向后兼容的方法 ==========
@@ -127,11 +181,18 @@ func (i *Issuer) IssueWithDefaults(claims *SubjectClaims, clientID string, scope
 		Phone:    claims.Phone,
 	}
 
-	encryptor := NewJWEEncryptor(i.encryptKey)
-	signer := NewEdDSASigner(i.signingKey)
+	// 使用默认的 encryptor 和 signer
+	originalEncryptor := i.encryptor
+	originalSigner := i.signer
+	i.encryptor = NewJWEEncryptor(i.encryptKey)
+	i.signer = NewEdDSASigner(i.signingKey)
+	defer func() {
+		i.encryptor = originalEncryptor
+		i.signer = originalSigner
+	}()
 
 	uat := NewUserAccessToken(i.issuerName, clientID, clientID, scope, ttl, user)
-	return i.Issue(uat, encryptor, signer)
+	return i.Issue(uat)
 }
 
 // VerifyAccessToken 验证 Access Token，返回完整身份信息（旧版兼容）
