@@ -2,15 +2,13 @@ package cache
 
 import (
 	"context"
-	"encoding/base64"
 
-	"github.com/heliannuuthus/helios/internal/config"
 	"github.com/heliannuuthus/helios/internal/hermes"
 	"github.com/heliannuuthus/helios/internal/hermes/models"
-	"github.com/heliannuuthus/helios/pkg/kms"
 )
 
 // HermesCache 带缓存的 hermes.Service 包装
+// 只做缓存，解密由 hermes.Service 完成
 type HermesCache struct {
 	svc     *hermes.Service
 	manager *Manager
@@ -36,19 +34,11 @@ func (h *HermesCache) GetService(ctx context.Context, serviceID string) (*Servic
 		return cached, nil
 	}
 
-	// 查库
-	svc, err := h.svc.GetService(ctx, serviceID)
+	// 从 hermes service 获取（已解密）
+	result, err := h.svc.GetServiceWithKey(ctx, serviceID)
 	if err != nil {
 		return nil, err
 	}
-
-	// 解密密钥
-	key, err := h.decryptServiceKey(svc)
-	if err != nil {
-		return nil, err
-	}
-
-	result := &Service{Service: *svc, Key: key}
 
 	// 存入缓存
 	h.manager.SetService(cacheKey, result)
@@ -66,32 +56,11 @@ func (h *HermesCache) GetApplication(ctx context.Context, appID string) (*Applic
 		return cached, nil
 	}
 
-	// 查库
-	app, err := h.svc.GetApplication(ctx, appID)
+	// 从 hermes service 获取（已解密）
+	result, err := h.svc.GetApplicationWithKey(ctx, appID)
 	if err != nil {
 		return nil, err
 	}
-
-	// 解密密钥（如果存在）
-	var key []byte
-	if app.EncryptedKey != nil && *app.EncryptedKey != "" {
-		domainKey, err := config.GetDomainEncryptKey(app.DomainID)
-		if err != nil {
-			return nil, err
-		}
-
-		encrypted, err := base64.StdEncoding.DecodeString(*app.EncryptedKey)
-		if err != nil {
-			return nil, err
-		}
-
-		key, err = kms.DecryptAESGCM(domainKey, encrypted, app.AppID)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	result := &Application{Application: *app, Key: key}
 
 	// 存入缓存
 	h.manager.SetApplication(cacheKey, result)
@@ -109,42 +78,16 @@ func (h *HermesCache) GetDomain(ctx context.Context, domainID string) (*Domain, 
 		return cached, nil
 	}
 
-	// 查库
-	domain, err := h.svc.GetDomain(ctx, domainID)
+	// 从 hermes service 获取（含密钥）
+	result, err := h.svc.GetDomainWithKey(ctx, domainID)
 	if err != nil {
 		return nil, err
-	}
-
-	// 获取签名密钥
-	signKey, err := config.GetDomainSignKey(domainID)
-	if err != nil {
-		return nil, err
-	}
-
-	result := &Domain{
-		Domain:  *domain,
-		SignKey: signKey,
 	}
 
 	// 存入缓存
 	h.manager.SetDomain(cacheKey, result)
 
 	return result, nil
-}
-
-// decryptServiceKey 解密 Service 密钥
-func (h *HermesCache) decryptServiceKey(svc *models.Service) ([]byte, error) {
-	domainKey, err := config.GetDomainEncryptKey(svc.DomainID)
-	if err != nil {
-		return nil, err
-	}
-
-	encrypted, err := base64.StdEncoding.DecodeString(svc.EncryptedKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return kms.DecryptAESGCM(domainKey, encrypted, svc.ServiceID)
 }
 
 // Close 关闭缓存
