@@ -4,10 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"sync"
 	"time"
+
+	"github.com/heliannuuthus/helios/pkg/json"
 )
 
 // Store 会话、授权码和 RefreshToken 存储接口

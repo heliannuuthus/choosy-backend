@@ -3,8 +3,9 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"time"
+
+	"github.com/heliannuuthus/helios/pkg/json"
 )
 
 // Client OAuth2 客户端

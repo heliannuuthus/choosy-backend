@@ -3,10 +3,10 @@ package models
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"time"
 
 	"github.com/heliannuuthus/helios/internal/auth"
+	"github.com/heliannuuthus/helios/pkg/json"
 )
 
 // Client OAuth2 客户端

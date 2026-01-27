@@ -2,9 +2,9 @@ package token
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
+	"github.com/heliannuuthus/helios/pkg/json"
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwe"
 	"github.com/lestrrat-go/jwx/v3/jwk"

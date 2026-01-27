@@ -2,11 +2,11 @@ package token
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/heliannuuthus/helios/internal/auth/cache"
+	"github.com/heliannuuthus/helios/pkg/json"
 	pkgtoken "github.com/heliannuuthus/helios/pkg/token"
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwe"
