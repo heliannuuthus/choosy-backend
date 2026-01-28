@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/heliannuuthus/helios/pkg/auth/utils"
+	"github.com/heliannuuthus/helios/pkg/json"
 	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwe"
+	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jwt"
 )
 
@@ -79,7 +81,7 @@ func (i *Interpreter) Interpret(ctx context.Context, tokenString string) (*Claim
 		return nil, fmt.Errorf("%w: missing sub", ErrMissingClaims)
 	}
 
-	userClaims, err := utils.DecryptUserClaims(encryptedSub, decryptKey)
+	userClaims, err := decryptUserClaims(encryptedSub, decryptKey)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt sub: %w", err)
 	}
@@ -148,3 +150,28 @@ type Identity = Claims
 // SubjectClaims 类型别名（向后兼容）
 // Deprecated: 使用 Claims 替代
 type SubjectClaims = Claims
+
+// decryptUserClaims 使用指定密钥解密用户信息
+func decryptUserClaims(encryptedSub string, decryptKey jwk.Key) (*Claims, error) {
+	var data []byte
+
+	if decryptKey == nil {
+		// 没有解密密钥则直接解析 JSON
+		data = []byte(encryptedSub)
+	} else {
+		decrypted, err := jwe.Decrypt([]byte(encryptedSub),
+			jwe.WithKey(jwa.DIRECT(), decryptKey),
+		)
+		if err != nil {
+			return nil, err
+		}
+		data = decrypted
+	}
+
+	var claims Claims
+	if err := json.Unmarshal(data, &claims); err != nil {
+		return nil, err
+	}
+
+	return &claims, nil
+}
