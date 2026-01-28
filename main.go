@@ -3,16 +3,15 @@ package main
 import (
 	"fmt"
 
+	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+
+	_ "github.com/heliannuuthus/helios/docs" // swagger docs
 	"github.com/heliannuuthus/helios/internal/config"
 	"github.com/heliannuuthus/helios/internal/middleware"
 	"github.com/heliannuuthus/helios/pkg/logger"
 	"github.com/heliannuuthus/helios/pkg/oss"
-
-	_ "github.com/heliannuuthus/helios/docs" // swagger docs
-
-	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // @title Helios API
@@ -90,11 +89,10 @@ func main() {
 	// Auth 路由（OAuth2.1/OIDC 风格）
 	authGroup := r.Group("/auth")
 	{
-		authGroup.GET("/authorize", app.AuthHandler.Authorize)    // 创建认证会话并重定向到登录页面
-		authGroup.POST("/login", app.AuthHandler.Login)           // IDP 登录
-		authGroup.POST("/token", app.AuthHandler.Token)           // 获取/刷新 Token
-		authGroup.POST("/introspect", app.AuthHandler.Introspect) // Token 内省
-		authGroup.POST("/revoke", app.AuthHandler.Revoke)         // 撤销 Token
+		authGroup.GET("/authorize", app.AuthHandler.Authorize) // 创建认证会话并重定向到登录页面
+		authGroup.POST("/login", app.AuthHandler.Login)        // IDP 登录
+		authGroup.POST("/token", app.AuthHandler.Token)        // 获取/刷新 Token
+		authGroup.POST("/revoke", app.AuthHandler.Revoke)      // 撤销 Token
 		authGroup.POST("/logout", middleware.RequireAuth(), app.AuthHandler.Logout)
 		authGroup.GET("/userinfo", middleware.RequireAuth(), app.AuthHandler.UserInfo)
 		authGroup.PUT("/userinfo", middleware.RequireAuth(), app.AuthHandler.UpdateUserInfo)

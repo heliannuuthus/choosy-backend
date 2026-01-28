@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aliyun/aliyun-oss-go-sdk/oss"
+
 	"github.com/heliannuuthus/helios/internal/config"
 	"github.com/heliannuuthus/helios/pkg/logger"
-
-	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 )
 
 var (

@@ -1,11 +1,12 @@
 package amap
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/heliannuuthus/helios/pkg/json"
 )
 
 // Client 高德地图客户端

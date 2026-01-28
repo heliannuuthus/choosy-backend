@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/heliannuuthus/helios/internal/config"
-	"github.com/heliannuuthus/helios/pkg/logger"
-
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
+
+	"github.com/heliannuuthus/helios/internal/config"
+	"github.com/heliannuuthus/helios/pkg/logger"
 )
 
 var (
@@ -85,13 +85,13 @@ func connectDB(dataSource string) (*gorm.DB, error) {
 		Logger: gormLog,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("连接数据库失败 (%s): %v", dataSource, err)
+		return nil, fmt.Errorf("连接数据库失败 (%s): %w", dataSource, err)
 	}
 
 	// 配置连接池
 	sqlDB, err := db.DB()
 	if err != nil {
-		return nil, fmt.Errorf("获取数据库连接失败 (%s): %v", dataSource, err)
+		return nil, fmt.Errorf("获取数据库连接失败 (%s): %w", dataSource, err)
 	}
 
 	// 设置连接池参数

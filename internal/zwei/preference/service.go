@@ -1,12 +1,12 @@
 package preference
 
 import (
-	"github.com/heliannuuthus/helios/internal/zwei/models"
-	"github.com/heliannuuthus/helios/internal/zwei/tag"
-
 	"sync"
 
 	"gorm.io/gorm"
+
+	"github.com/heliannuuthus/helios/internal/zwei/models"
+	"github.com/heliannuuthus/helios/internal/zwei/tag"
 )
 
 // Service 用户偏好服务

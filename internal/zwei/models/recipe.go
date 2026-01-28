@@ -2,8 +2,9 @@ package models
 
 import (
 	"database/sql/driver"
-	"encoding/json"
 	"errors"
+
+	"github.com/heliannuuthus/helios/pkg/json"
 )
 
 // StringSlice JSON 存储的字符串数组

@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -72,7 +73,9 @@ func InitWithConfig(cfg Config) {
 // Sync 刷新日志缓冲
 func Sync() {
 	if Log != nil {
-		_ = Log.Sync()
+		if err := Log.Sync(); err != nil {
+			// 忽略同步错误，因为日志系统不应该因为同步失败而崩溃
+		}
 	}
 }
 
@@ -146,7 +149,11 @@ func (w *GormLogWriter) Printf(format string, args ...interface{}) {
 func init() {
 	// 确保即使没调用 Init 也能用（使用默认 logger）
 	if Log == nil {
-		Log, _ = zap.NewDevelopment()
+		var err error
+		Log, err = zap.NewDevelopment()
+		if err != nil {
+			panic(fmt.Sprintf("init logger failed: %v", err))
+		}
 		Sugar = Log.Sugar()
 	}
 }

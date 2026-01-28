@@ -9,6 +9,9 @@ bin/
 # Environment
 .env
 config.toml
+auth.config.toml
+zwei.config.toml
+hermes.config.toml
 
 # Database
 *.db

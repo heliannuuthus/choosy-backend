@@ -5,11 +5,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/heliannuuthus/helios/internal/auth"
-	"github.com/heliannuuthus/helios/pkg/logger"
-
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+
+	"github.com/heliannuuthus/helios/internal/auth"
+	"github.com/heliannuuthus/helios/pkg/logger"
 )
 
 // Handler 推荐处理器
@@ -84,7 +84,7 @@ func (h *Handler) GetRecommendations(c *gin.Context) {
 
 	// 获取用户身份（如果已登录）
 	if user, exists := c.Get("user"); exists {
-		identity := user.(*auth.Identity)
+		identity := user.(*auth.Claims)
 		ctx.UserID = identity.GetOpenID()
 	}
 

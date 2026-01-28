@@ -1,11 +1,13 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
@@ -45,7 +47,8 @@ func Load() {
 
 	// 读取配置文件
 	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		var configFileNotFoundErr viper.ConfigFileNotFoundError
+		if !errors.As(err, &configFileNotFoundErr) {
 			panic("读取配置文件失败: " + err.Error())
 		}
 		panic("配置文件不存在，请创建 config.toml")
@@ -75,16 +78,16 @@ func Load() {
 	})
 }
 
-// ConfigChange 配置变更
-type ConfigChange struct {
+// Change 配置变更
+type Change struct {
 	Key      string
 	OldValue any
 	NewValue any
 }
 
 // detectChanges 检测配置变更
-func detectChanges(prefix string, old, new map[string]any) []ConfigChange {
-	var changes []ConfigChange
+func detectChanges(prefix string, old, new map[string]any) []Change {
+	var changes []Change
 
 	// 检查新增和修改的 key
 	for k, newVal := range new {
@@ -95,7 +98,7 @@ func detectChanges(prefix string, old, new map[string]any) []ConfigChange {
 
 		oldVal, exists := old[k]
 		if !exists {
-			changes = append(changes, ConfigChange{Key: key, OldValue: nil, NewValue: newVal})
+			changes = append(changes, Change{Key: key, OldValue: nil, NewValue: newVal})
 			continue
 		}
 
@@ -109,7 +112,7 @@ func detectChanges(prefix string, old, new map[string]any) []ConfigChange {
 
 		// 值比较
 		if !reflect.DeepEqual(oldVal, newVal) {
-			changes = append(changes, ConfigChange{Key: key, OldValue: oldVal, NewValue: newVal})
+			changes = append(changes, Change{Key: key, OldValue: oldVal, NewValue: newVal})
 		}
 	}
 
@@ -121,7 +124,7 @@ func detectChanges(prefix string, old, new map[string]any) []ConfigChange {
 		}
 
 		if _, exists := new[k]; !exists {
-			changes = append(changes, ConfigChange{Key: key, OldValue: oldVal, NewValue: nil})
+			changes = append(changes, Change{Key: key, OldValue: oldVal, NewValue: nil})
 		}
 	}
 
@@ -139,8 +142,10 @@ func V() *viper.Viper {
 // 便捷方法（viper 内部已线程安全）
 func GetString(key string) string                     { return V().GetString(key) }
 func GetInt(key string) int                           { return V().GetInt(key) }
+func GetInt64(key string) int64                       { return V().GetInt64(key) }
 func GetBool(key string) bool                         { return V().GetBool(key) }
 func GetStringSlice(key string) []string              { return V().GetStringSlice(key) }
 func GetStringMap(key string) map[string]any          { return V().GetStringMap(key) }
 func GetStringMapString(key string) map[string]string { return V().GetStringMapString(key) }
+func GetDuration(key string) time.Duration            { return V().GetDuration(key) }
 func Get(key string) any                              { return V().Get(key) }

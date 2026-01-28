@@ -1,9 +1,9 @@
 package middleware
 
 import (
-	"github.com/heliannuuthus/helios/internal/config"
-
 	"github.com/gin-gonic/gin"
+
+	"github.com/heliannuuthus/helios/internal/config"
 )
 
 const (

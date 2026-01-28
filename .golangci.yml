@@ -1,31 +1,267 @@
+# golangci-lint 配置文件版本 2
+# 适用于 golangci-lint 2.8 版本
 version: "2"
+
+# Linters 配置
 linters:
+  # 使用标准预设（推荐用于大多数项目）
+  # 可选值: standard, all, none, fast
+  default: standard
+  
+  # 启用额外的推荐 linters
   enable:
-    - misspell
-    - unconvert
-    - unparam
+    # 代码质量
+    - errcheck          # 检查未处理的错误
+    - govet             # Go 官方 vet 工具
+    - staticcheck       # 静态分析（包含 gosimple）
+    - unused            # 检查未使用的代码
+    - ineffassign       # 检查无效赋值
+    
+    # 代码风格
+    - misspell          # 拼写检查
+    - revive            # 强大的 linter，替代 golint
+    
+    # 复杂度检查
+    - gocyclo           # 循环复杂度
+    - gocognit          # 认知复杂度
+    
+    # 性能
+    - prealloc          # 预分配检查
+    - unconvert         # 不必要的类型转换
+    
+    # 错误处理
+    - errorlint         # 错误处理最佳实践
+    - errname           # 错误命名规范
+    
+    # 安全
+    - gosec             # 安全检查
+    
+    # 其他
+    - unparam           # 未使用的参数
+    - nakedret          # 裸返回检查
+    - noctx             # 缺少 context 参数
+    - copyloopvar       # 循环变量复制问题（Go 1.22+）
+
+  # 禁用某些可能过于严格的 linters（可根据项目需要调整）
+  disable:
+    - funlen            # 函数长度检查（可能过于严格）
+    - lll               # 行长度检查（可能过于严格）
+    - dupl              # 重复代码检查（可能产生误报）
+    - gocritic          # 代码批评（可选，启用后会有更多检查）
+
+  # Linter 设置
+  settings:
+    # errcheck 设置
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    
+    # gocyclo 设置
+    gocyclo:
+      min-complexity: 15  # 最小复杂度阈值
+    
+    # gocognit 设置
+    gocognit:
+      min-complexity: 20  # 最小认知复杂度
+    
+    # revive 设置
+    revive:
+      severity: warning
+      confidence: 0.8
+      rules:
+        - name: var-naming
+        - name: package-comments
+        # - name: exported  # 暂时禁用，避免大量重构
+        - name: error-return
+        - name: error-naming
+        - name: errorf
+        - name: if-return
+        - name: increment-decrement
+        - name: var-declaration
+        - name: range
+        - name: range-val-in-closure
+        - name: waitgroup-by-value
+        - name: atomic
+        - name: empty-block
+        # - name: unused-parameter  # 暂时禁用，避免大量重构
+        # - name: unused-receiver   # 暂时禁用，避免大量重构
+    
+    # gosec 设置
+    gosec:
+      severity: medium
+      confidence: medium
+      excludes:
+        - G104  # 审计未检查的错误（与 errcheck 重复）
+    
+    # misspell 设置
+    misspell:
+      locale: US
+    
+    # staticcheck 设置
+    staticcheck:
+      checks: ["all"]
+    
+    # unused 设置
+    unused:
+      check-exported: false  # 不检查导出的函数（避免误报）
+
+  # 排除规则
   exclusions:
+    # 预定义的排除预设
     presets:
-      - comments
-      - common-false-positives
-      - legacy
-      - std-error-handling
+      - comments              # 注释相关
+      - common-false-positives # 常见误报
+      - legacy                # 遗留代码
+    
+    # 排除路径
     paths:
       - vendor
       - third_party$
       - builtin$
       - examples$
+      - ".*\\.pb\\.go$"       # 排除 protobuf 生成的文件
+      - ".*\\.gen\\.go$"      # 排除其他生成的文件
+    
+    # 规则排除
+    rules:
+      # 测试文件中放宽复杂度检查
+      - path: _test\.go$
+        linters:
+          - gocyclo
+          - gocognit
+      
+      # 测试文件中允许未使用的参数
+      - path: _test\.go$
+        linters:
+          - unparam
+
+# Formatters 配置
 formatters:
   enable:
     - gofmt
     - goimports
+    - gci
+  
   settings:
     goimports:
       local-prefixes:
-        - choosy-backend
+        - github.com/heliannuuthus/helios
+    
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/heliannuuthus/helios)
+      skip-generated: true
+      custom-order: true
+  
   exclusions:
     paths:
       - vendor
       - third_party$
       - builtin$
       - examples$
+      - ".*\\.pb\\.go$"
+      - ".*\\.gen\\.go$"
+
+# Issues 配置
+issues:
+  # 每个 linter 的最大问题数
+  max-issues-per-linter: 50
+  
+  # 相同问题的最大数量
+  max-same-issues: 3
+  
+  # 按行去重
+  uniq-by-line: true
+  
+  # 排除目录
+  exclude-dirs:
+    - vendor
+    - third_party
+    - examples
+    - builtin
+  
+  # 排除文件
+  exclude-files:
+    - ".*\\.pb\\.go$"
+    - ".*\\.gen\\.go$"
+  
+  # 生成的代码排除模式
+  exclude-generated: lax
+  
+  # 排除规则
+  exclude-rules:
+    # 测试文件中放宽某些检查
+    - path: _test\.go$
+      linters:
+        - gocyclo
+        - gocognit
+        - funlen
+    
+    # 排除一些常见的误报
+    - linters:
+        - staticcheck
+      text: "SA1019:"  # 使用已弃用的函数（某些情况下可以接受）
+    
+    # 排除特定路径的特定问题
+    - path: internal/
+      text: "weak cryptographic primitive"
+      linters:
+        - gosec
+    
+    # 排除 defer Close() 的错误检查（defer 会处理错误）
+    - linters:
+        - errcheck
+      text: "Error return value of `.*\\.Close` is not checked"
+    
+    # 排除 json.Marshal/Unmarshal 的错误检查（某些情况下可以接受）
+    - linters:
+        - errcheck
+      text: "Error return value of `json\\.(Marshal|Unmarshal)` is not checked"
+    
+    # 排除 rand.Read/rand.Int 的错误检查（随机数生成失败概率极低）
+    - linters:
+        - errcheck
+      text: "Error return value of `rand\\.(Read|Int)` is not checked"
+
+# 运行配置
+run:
+  # 超时设置
+  timeout: 5m
+  
+  # 相对路径模式：相对于 go.mod 文件
+  relative-path-mode: gomod
+  
+  # 包含测试文件
+  tests: true
+  
+  # 模块下载模式
+  modules-download-mode: readonly
+  
+  # 并发数（0 表示自动）
+  concurrency: 0
+  
+  # 允许并行运行
+  allow-parallel-runners: false
+
+# 输出配置
+output:
+  # 打印问题代码行
+  print-issued-lines: true
+  
+  # 打印 linter 名称
+  print-linter-name: true
+  
+  # 显示统计信息
+  show-stats: true
+  
+  # 排序顺序
+  sort-order:
+    - file
+    - linter
+
+# 严重程度配置
+severity:
+  # 默认严重程度
+  default: warning

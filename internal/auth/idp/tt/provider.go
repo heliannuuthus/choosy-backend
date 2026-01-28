@@ -2,7 +2,7 @@ package tt
 
 import (
 	"bytes"
-	"encoding/json"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -11,32 +11,34 @@ import (
 
 	"github.com/tidwall/gjson"
 
+	"github.com/heliannuuthus/helios/internal/auth/idp"
 	"github.com/heliannuuthus/helios/internal/config"
+	"github.com/heliannuuthus/helios/pkg/json"
 	"github.com/heliannuuthus/helios/pkg/logger"
 )
 
-// Code2SessionResponse TT code2session 响应
-type Code2SessionResponse struct {
-	OpenID     string `json:"openid"`
-	SessionKey string `json:"session_key"`
-	UnionID    string `json:"unionid,omitempty"`
-	ErrCode    int    `json:"errcode,omitempty"`
-	ErrMsg     string `json:"errmsg,omitempty"`
+// Provider 抖音小程序 Provider
+type Provider struct {
+	appID     string
+	appSecret string
 }
 
-// Client 抖音客户端
-type Client struct{}
-
-// NewClient 创建抖音客户端
-func NewClient() *Client {
-	return &Client{}
+// NewProvider 创建抖音 Provider
+func NewProvider() *Provider {
+	return &Provider{
+		appID:     config.GetString("idps.tt.appid"),
+		appSecret: config.GetString("idps.tt.secret"),
+	}
 }
 
-// Code2Session 调用 TT code2session 接口
-func (c *Client) Code2Session(code string) (*Code2SessionResponse, error) {
-	appid := config.GetString("idps.tt.appid")
-	secret := config.GetString("idps.tt.secret")
-	if appid == "" || secret == "" {
+// Type 返回 IDP 类型
+func (p *Provider) Type() string {
+	return idp.TypeTTMP
+}
+
+// Exchange 用 code 换取用户信息
+func (p *Provider) Exchange(ctx context.Context, code string) (*idp.ExchangeResult, error) {
+	if p.appID == "" || p.appSecret == "" {
 		return nil, errors.New("TT 小程序 IdP 未配置")
 	}
 
@@ -44,8 +46,8 @@ func (c *Client) Code2Session(code string) (*Code2SessionResponse, error) {
 
 	// 抖音 API 使用 POST 请求，body 为 JSON
 	reqBody := map[string]string{
-		"appid":  appid,
-		"secret": secret,
+		"appid":  p.appID,
+		"secret": p.appSecret,
 		"code":   code,
 	}
 	reqBodyBytes, err := json.Marshal(reqBody)
@@ -56,7 +58,7 @@ func (c *Client) Code2Session(code string) (*Code2SessionResponse, error) {
 
 	reqURL := "https://developer.toutiao.com/api/apps/v2/jscode2session"
 
-	req, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(reqBodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, bytes.NewBuffer(reqBodyBytes))
 	if err != nil {
 		logger.Errorf("[TT] 创建请求失败: %v", err)
 		return nil, fmt.Errorf("创建请求失败: %w", err)
@@ -72,7 +74,10 @@ func (c *Client) Code2Session(code string) (*Code2SessionResponse, error) {
 
 	// 先检查 HTTP 状态码
 	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			logger.Warnf("[TT] read response body failed: %v", err)
+		}
 		logger.Errorf("[TT] API 返回非 200 状态码: %d, 响应: %s", resp.StatusCode, string(bodyBytes))
 		return nil, fmt.Errorf("API 请求失败: HTTP %d", resp.StatusCode)
 	}
@@ -104,52 +109,48 @@ func (c *Client) Code2Session(code string) (*Code2SessionResponse, error) {
 	}
 
 	// 解析 data 字段
-	var data struct {
-		SessionKey string `json:"session_key"`
-		OpenID     string `json:"openid"`
-		UnionID    string `json:"unionid,omitempty"`
-	}
+	openID := gjson.GetBytes(bodyBytes, "data.openid").String()
+	unionID := gjson.GetBytes(bodyBytes, "data.unionid").String()
 
-	if err := json.Unmarshal([]byte(dataRaw.Raw), &data); err != nil {
-		logger.Errorf("[TT] 解析 data 字段失败: %v", err)
-		return nil, fmt.Errorf("解析 data 字段失败: %w", err)
-	}
-
-	if data.OpenID == "" {
+	if openID == "" {
 		logger.Errorf("[TT] data 中缺少 openid")
 		return nil, errors.New("data 中缺少 openid")
 	}
 
-	unionID := "(无)"
-	if data.UnionID != "" {
-		unionID = data.UnionID
+	unionIDLog := "(无)"
+	if unionID != "" {
+		unionIDLog = unionID
 	}
-	logger.Infof("[TT] 登录成功 - OpenID: %s, UnionID: %s", data.OpenID, unionID)
+	logger.Infof("[TT] 登录成功 - OpenID: %s, UnionID: %s", openID, unionIDLog)
 
-	return &Code2SessionResponse{
-		OpenID:     data.OpenID,
-		SessionKey: data.SessionKey,
-		UnionID:    data.UnionID,
+	return &idp.ExchangeResult{
+		ProviderID: openID,
+		UnionID:    unionID,
+		RawData:    fmt.Sprintf(`{"openid":"%s","unionid":"%s"}`, openID, unionID),
 	}, nil
 }
 
 // GetPhoneNumber 获取抖音手机号
-func (c *Client) GetPhoneNumber(code string) (string, error) {
-	appid := config.GetString("idps.tt.appid")
-	secret := config.GetString("idps.tt.secret")
-	if appid == "" || secret == "" {
+func (p *Provider) GetPhoneNumber(ctx context.Context, code string) (string, error) {
+	if p.appID == "" || p.appSecret == "" {
 		return "", errors.New("TT 小程序配置缺失")
 	}
 
-	accessToken, err := c.getAccessToken()
+	accessToken, err := p.getAccessToken(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	url := fmt.Sprintf("https://developer.toutiao.com/api/apps/v2/user/get_phone_number?access_token=%s", accessToken)
+	reqURL := fmt.Sprintf("https://developer.toutiao.com/api/apps/v2/user/get_phone_number?access_token=%s", accessToken)
 
 	body := fmt.Sprintf(`{"code":"%s"}`, code)
-	resp, err := http.Post(url, "application/json", strings.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, strings.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("创建请求失败: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		logger.Errorf("[TT] 请求获取手机号接口失败: %v", err)
 		return "", fmt.Errorf("请求 TT 接口失败: %w", err)
@@ -183,16 +184,19 @@ func (c *Client) GetPhoneNumber(code string) (string, error) {
 }
 
 // getAccessToken 获取 TT access_token
-func (c *Client) getAccessToken() (string, error) {
-	appid := config.GetString("idps.tt.appid")
-	secret := config.GetString("idps.tt.secret")
-	if appid == "" || secret == "" {
+func (p *Provider) getAccessToken(ctx context.Context) (string, error) {
+	if p.appID == "" || p.appSecret == "" {
 		return "", errors.New("TT 小程序配置缺失")
 	}
 
-	url := fmt.Sprintf("https://developer.toutiao.com/api/apps/v2/token?appid=%s&secret=%s&grant_type=client_credential", appid, secret)
+	reqURL := fmt.Sprintf("https://developer.toutiao.com/api/apps/v2/token?appid=%s&secret=%s&grant_type=client_credential", p.appID, p.appSecret)
 
-	resp, err := http.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("创建请求失败: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("请求 TT access_token 失败: %w", err)
 	}

@@ -49,9 +49,14 @@ func provideHomeHandler() *home.Handler {
 	return home.NewHandler(database.GetZwei())
 }
 
-// 认证模块 Handler（使用 Auth 数据库）
-func provideAuthHandler() (*auth.Handler, error) {
-	authService, err := auth.NewService(database.GetAuth())
+// Hermes Service（供 auth 模块复用）
+func provideHermesService() *hermes.Service {
+	return hermes.NewService()
+}
+
+// 认证模块 Handler（使用 Auth 数据库，依赖 hermes.Service）
+func provideAuthHandler(hermesService *hermes.Service) (*auth.Handler, error) {
+	authService, err := auth.NewService(database.GetAuth(), hermesService)
 	if err != nil {
 		return nil, err
 	}
@@ -62,9 +67,8 @@ func provideUploadHandler() *upload.Handler {
 	return upload.NewHandler(database.GetAuth())
 }
 
-func provideHermesHandler() *hermes.Handler {
-	service := hermes.NewService()
-	return hermes.NewHandler(service)
+func provideHermesHandler(hermesService *hermes.Service) *hermes.Handler {
+	return hermes.NewHandler(hermesService)
 }
 
 // provideDB 提供默认数据库连接（用于 App.DB 字段，保持兼容性）
@@ -89,11 +93,12 @@ var ProviderSet = wire.NewSet(
 	provideTagHandler,
 	provideRecommendHandler,
 	provideHomeHandler,
-	// 认证模块（使用 Auth 数据库）
+	// Hermes 模块（使用 Auth 数据库，提供给 auth 复用）
+	provideHermesService,
+	provideHermesHandler,
+	// 认证模块（使用 Auth 数据库，依赖 hermes.Service）
 	provideAuthHandler,
 	provideUploadHandler,
-	// Hermes 模块（使用 Auth 数据库）
-	provideHermesHandler,
 )
 
 // App 应用依赖容器

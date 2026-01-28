@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/heliannuuthus/helios/internal/zwei/models"
-
 	"gorm.io/gorm"
+
+	"github.com/heliannuuthus/helios/internal/zwei/models"
 )
 
 // Service 浏览历史服务

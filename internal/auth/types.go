@@ -3,7 +3,8 @@ package auth
 import (
 	"fmt"
 	"strings"
-	"time"
+
+	"github.com/heliannuuthus/helios/internal/auth/token"
 )
 
 // Domain 用户域
@@ -79,6 +80,7 @@ const (
 type AuthorizeRequest struct {
 	ResponseType        string              `form:"response_type" binding:"required,oneof=code"` // 只允许 code
 	ClientID            string              `form:"client_id" binding:"required"`
+	Audience            string              `form:"audience" binding:"required"` // 目标服务 ID
 	RedirectURI         string              `form:"redirect_uri" binding:"required"`
 	CodeChallenge       string              `form:"code_challenge" binding:"required"`
 	CodeChallengeMethod CodeChallengeMethod `form:"code_challenge_method" binding:"required,oneof=S256"` // 只允许 S256
@@ -112,7 +114,7 @@ type CaptureConfig struct {
 
 // IDPsResponse IDPs 列表响应
 type IDPsResponse struct {
-	IDPs []IDPConfig `json:"idps"`
+	IDPs interface{} `json:"idps"` // ConnectionConfig 或 IDPConfig 数组
 }
 
 // LoginRequest 登录请求
@@ -152,26 +154,6 @@ type TokenResponse struct {
 	TokenType    string `json:"token_type"`
 	ExpiresIn    int    `json:"expires_in"`
 	Scope        string `json:"scope"` // 实际授予的 scope
-}
-
-// IntrospectRequest Token 内省请求
-type IntrospectRequest struct {
-	Token string `form:"token" binding:"required"`
-}
-
-// IntrospectResponse Token 内省响应
-type IntrospectResponse struct {
-	Active   bool   `json:"active"`
-	Sub      string `json:"sub,omitempty"`
-	Aud      string `json:"aud,omitempty"`
-	Iss      string `json:"iss,omitempty"`
-	Exp      int64  `json:"exp,omitempty"`
-	Iat      int64  `json:"iat,omitempty"`
-	Scope    string `json:"scope,omitempty"`
-	Nickname string `json:"nickname,omitempty"`
-	Picture  string `json:"picture,omitempty"`
-	Email    string `json:"email,omitempty"`
-	Phone    string `json:"phone,omitempty"`
 }
 
 // RevokeRequest 撤销请求
@@ -229,80 +211,10 @@ func NewError(code, description string) *Error {
 	return &Error{Code: code, Description: description}
 }
 
-// ============= Internal Types =============
+// ============= Type Aliases =============
 
-// Session 认证会话
-type Session struct {
-	ID                  string              `json:"id"`
-	ClientID            string              `json:"client_id"`
-	RedirectURI         string              `json:"redirect_uri"`
-	CodeChallenge       string              `json:"code_challenge"`
-	CodeChallengeMethod CodeChallengeMethod `json:"code_challenge_method"`
-	State               string              `json:"state"`
-	Scope               string              `json:"scope"`
-	Connection          string              `json:"connection,omitempty"` // 用户选择的 connection
-	CreatedAt           time.Time           `json:"created_at"`
-	ExpiresAt           time.Time           `json:"expires_at"`
-
-	// 登录后填充
-	UserID       string `json:"user_id,omitempty"`
-	IDP          IDP    `json:"idp,omitempty"`
-	GrantedScope string `json:"granted_scope,omitempty"` // 实际授予的 scope
-}
-
-// AuthorizationCode 授权码
-type AuthorizationCode struct {
-	Code                string    `json:"code"`
-	ClientID            string    `json:"client_id"`
-	RedirectURI         string    `json:"redirect_uri"`
-	CodeChallenge       string    `json:"code_challenge"`
-	CodeChallengeMethod string    `json:"code_challenge_method"`
-	Scope               string    `json:"scope"` // 实际授予的 scope
-	UserID              string    `json:"user_id"`
-	CreatedAt           time.Time `json:"created_at"`
-	ExpiresAt           time.Time `json:"expires_at"`
-	Used                bool      `json:"used"`
-}
-
-// SubjectClaims sub 字段解密后的内容
-type SubjectClaims struct {
-	OpenID   string `json:"openid"`
-	Nickname string `json:"nickname,omitempty"`
-	Picture  string `json:"picture,omitempty"`
-	Email    string `json:"email,omitempty"`
-	Phone    string `json:"phone,omitempty"`
-}
-
-// Identity Token 解析后的身份信息
-type Identity struct {
-	UserID   string `json:"sub"`
-	Scope    string `json:"scope"`
-	Nickname string `json:"nickname,omitempty"`
-	Picture  string `json:"picture,omitempty"`
-	Email    string `json:"email,omitempty"`
-	Phone    string `json:"phone,omitempty"`
-}
-
-// GetOpenID 兼容旧接口
-func (i *Identity) GetOpenID() string {
-	return i.UserID
-}
-
-// OpenID 兼容旧接口
-func (i *Identity) OpenID() string {
-	return i.UserID
-}
-
-// HasScope 检查是否包含某个 scope
-func (i *Identity) HasScope(scope string) bool {
-	scopes := strings.Fields(i.Scope)
-	for _, s := range scopes {
-		if s == scope {
-			return true
-		}
-	}
-	return false
-}
+// Claims Token 解析后的身份信息（类型别名，实际定义在 token 包）
+type Claims = token.Claims
 
 // ============= Scope Helpers =============
 

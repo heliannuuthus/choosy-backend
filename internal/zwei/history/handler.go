@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/heliannuuthus/helios/internal/auth"
-
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+
+	"github.com/heliannuuthus/helios/internal/auth"
 )
 
 // Handler 浏览历史处理器
@@ -59,7 +59,7 @@ func (h *Handler) AddViewHistory(c *gin.Context) {
 		return
 	}
 
-	identity := user.(*auth.Identity)
+	identity := user.(*auth.Claims)
 	openID := identity.GetOpenID()
 
 	var req HistoryRequest
@@ -94,7 +94,7 @@ func (h *Handler) RemoveViewHistory(c *gin.Context) {
 		return
 	}
 
-	identity := user.(*auth.Identity)
+	identity := user.(*auth.Claims)
 	openID := identity.GetOpenID()
 	recipeID := c.Param("recipe_id")
 
@@ -119,7 +119,7 @@ func (h *Handler) ClearViewHistory(c *gin.Context) {
 		return
 	}
 
-	identity := user.(*auth.Identity)
+	identity := user.(*auth.Claims)
 	openID := identity.GetOpenID()
 
 	if err := h.service.ClearViewHistory(openID); err != nil {
@@ -148,7 +148,7 @@ func (h *Handler) GetViewHistory(c *gin.Context) {
 		return
 	}
 
-	identity := user.(*auth.Identity)
+	identity := user.(*auth.Claims)
 	openID := identity.GetOpenID()
 
 	category := c.Query("category")

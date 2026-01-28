@@ -2,21 +2,22 @@ package recommend
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/invopop/jsonschema"
+	"github.com/sashabaranov/go-openai"
+	"gorm.io/gorm"
 
 	"github.com/heliannuuthus/helios/internal/config"
 	"github.com/heliannuuthus/helios/internal/zwei/models"
 	"github.com/heliannuuthus/helios/internal/zwei/tag"
 	"github.com/heliannuuthus/helios/pkg/amap"
+	"github.com/heliannuuthus/helios/pkg/json"
 	"github.com/heliannuuthus/helios/pkg/logger"
 	"github.com/heliannuuthus/helios/pkg/utils"
-
-	"github.com/invopop/jsonschema"
-	"github.com/sashabaranov/go-openai"
-	"gorm.io/gorm"
 )
 
 // Service 推荐服务
@@ -495,7 +496,8 @@ func (s *Service) getLLMRecommendations(recCtx *recommendContext, userHistory *U
 
 		resp, err := s.llmClient.CreateChatCompletion(context.Background(), req)
 		if err != nil {
-			if apiErr, ok := err.(*openai.APIError); ok {
+			apiErr := &openai.APIError{}
+			if errors.As(err, &apiErr) {
 				logger.Errorf("[Recommend] LLM 调用失败 - Model: %s, APIError详情: Code=%d, HTTPStatusCode=%d, Message=%s",
 					model, apiErr.Code, apiErr.HTTPStatusCode, apiErr.Message)
 				return nil, fmt.Errorf("LLM 调用失败 (model: %s): status code: %d, message: %s",

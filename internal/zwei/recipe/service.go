@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dgraph-io/ristretto/v2"
+	"gorm.io/gorm"
+
 	"github.com/heliannuuthus/helios/internal/zwei/models"
 	"github.com/heliannuuthus/helios/internal/zwei/tag"
-
-	"github.com/dgraph-io/ristretto"
-	"gorm.io/gorm"
 )
 
 const (
@@ -26,7 +26,7 @@ const (
 // categoryCacheRefresher 分类缓存刷新器（内聚的刷新逻辑）
 type categoryCacheRefresher struct {
 	db            *gorm.DB
-	cache         *ristretto.Cache
+	cache         *ristretto.Cache[string, any]
 	refreshMutex  sync.Mutex
 	isRefreshing  bool
 	refreshTicker *time.Ticker
@@ -34,7 +34,7 @@ type categoryCacheRefresher struct {
 }
 
 // newCategoryCacheRefresher 创建分类缓存刷新器
-func newCategoryCacheRefresher(db *gorm.DB, cache *ristretto.Cache) *categoryCacheRefresher {
+func newCategoryCacheRefresher(db *gorm.DB, cache *ristretto.Cache[string, any]) *categoryCacheRefresher {
 	return &categoryCacheRefresher{
 		db:       db,
 		cache:    cache,
@@ -113,7 +113,7 @@ func (r *categoryCacheRefresher) start() {
 // Service 菜谱服务
 type Service struct {
 	db                     *gorm.DB
-	categoriesCache        *ristretto.Cache
+	categoriesCache        *ristretto.Cache[string, any]
 	categoryCacheRefresher *categoryCacheRefresher
 }
 
@@ -122,7 +122,7 @@ func NewService(db *gorm.DB) *Service {
 	s := &Service{db: db}
 
 	// 初始化 Ristretto 缓存
-	cache, err := ristretto.NewCache(&ristretto.Config{
+	cache, err := ristretto.NewCache(&ristretto.Config[string, any]{
 		NumCounters: cacheNumCounters,
 		MaxCost:     cacheMaxCost,
 		BufferItems: cacheBufferItems,
