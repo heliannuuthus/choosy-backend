@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/heliannuuthus/helios/pkg/auth/token"
 	"github.com/heliannuuthus/helios/pkg/logger"
-	pkgtoken "github.com/heliannuuthus/helios/pkg/token"
 
 	"github.com/gin-gonic/gin"
 )
@@ -37,7 +37,7 @@ func tokenPreview(tokenStr string, length int) string {
 }
 
 // RequireToken 新版本认证中间件（使用 token.Interpreter）
-func RequireToken(v *pkgtoken.Interpreter) gin.HandlerFunc {
+func RequireToken(v *token.Interpreter) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authorization := c.GetHeader("Authorization")
 		if authorization == "" {
@@ -69,7 +69,7 @@ func RequireToken(v *pkgtoken.Interpreter) gin.HandlerFunc {
 }
 
 // OptionalToken 新版本可选认证中间件（使用 token.Interpreter）
-func OptionalToken(v *pkgtoken.Interpreter) gin.HandlerFunc {
+func OptionalToken(v *token.Interpreter) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authorization := c.GetHeader("Authorization")
 		if authorization == "" {

@@ -5,25 +5,24 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/heliannuuthus/helios/pkg/auth/token"
 	"github.com/lestrrat-go/jwx/v3/jwt"
-
-	pkgtoken "github.com/heliannuuthus/helios/pkg/token"
 )
 
 // UserAccessToken 用户访问令牌
 // 包含用户身份信息，sub 字段为加密的用户信息（JWE）
 type UserAccessToken struct {
-	issuer    string           // 签发者
-	clientID  string           // cli - 应用 ID
-	audience  string           // aud - 服务 ID
-	scope     string           // 授权范围
-	ttl       time.Duration    // 有效期
-	notBefore time.Time        // 生效时间
-	user      *pkgtoken.Claims // 用户信息（根据 scope 填充）
+	issuer    string         // 签发者
+	clientID  string         // cli - 应用 ID
+	audience  string         // aud - 服务 ID
+	scope     string         // 授权范围
+	ttl       time.Duration  // 有效期
+	notBefore time.Time      // 生效时间
+	user      *token.Claims  // 用户信息（根据 scope 填充）
 }
 
 // NewUserAccessToken 创建 UserAccessToken
-func NewUserAccessToken(issuer, clientID, audience, scope string, ttl time.Duration, user *pkgtoken.Claims) *UserAccessToken {
+func NewUserAccessToken(issuer, clientID, audience, scope string, ttl time.Duration, user *token.Claims) *UserAccessToken {
 	return &UserAccessToken{
 		issuer:    issuer,
 		clientID:  clientID,
@@ -87,7 +86,7 @@ func (u *UserAccessToken) GetNotBefore() time.Time {
 }
 
 // GetUser 返回用户信息
-func (u *UserAccessToken) GetUser() *pkgtoken.Claims {
+func (u *UserAccessToken) GetUser() *token.Claims {
 	return u.user
 }
 
@@ -98,8 +97,8 @@ func (u *UserAccessToken) GetScope() string {
 
 // UserClaimsFromScope 根据 scope 构建用户 Claims
 // scope 决定哪些用户信息会被包含在 token 中
-func UserClaimsFromScope(openID, nickname, picture, email, phone, scope string) *pkgtoken.Claims {
-	claims := &pkgtoken.Claims{
+func UserClaimsFromScope(openID, nickname, picture, email, phone, scope string) *token.Claims {
+	claims := &token.Claims{
 		OpenID: openID,
 	}
 

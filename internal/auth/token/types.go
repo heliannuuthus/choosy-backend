@@ -3,7 +3,7 @@ package token
 import (
 	"errors"
 
-	pkgtoken "github.com/heliannuuthus/helios/pkg/token"
+	pkgtoken "github.com/heliannuuthus/helios/pkg/auth/token"
 )
 
 // Token 验证错误
@@ -14,7 +14,7 @@ var (
 	ErrMissingClaims       = errors.New("missing required claims")
 )
 
-// Claims 类型别名（使用 pkg/token 中的定义）
+// Claims 类型别名（使用 pkg/auth/token 中的定义）
 type Claims = pkgtoken.Claims
 
 // SubjectClaims 类型别名（向后兼容）
@@ -25,5 +25,5 @@ type SubjectClaims = pkgtoken.Claims
 // Deprecated: 使用 Claims 替代
 type Identity = pkgtoken.Claims
 
-// AccessToken 类型别名（使用 pkg/token 中的定义）
+// AccessToken 类型别名（使用 pkg/auth/token 中的定义）
 type AccessToken = pkgtoken.AccessToken
